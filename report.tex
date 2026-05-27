@@ -1,0 +1,200 @@
+\documentclass[12pt, a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[fontset=fandol]{ctex} % 支持中文，并使用 TeXLive 自带中文字体
+\usepackage{amsmath, amssymb, amsfonts}
+\usepackage{graphicx}
+\usepackage{geometry}
+\usepackage{float}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+
+\title{\textbf{控制部分大作业二：轮腿机器人姿态与运动控制对比研究}}
+\author{（此处填入姓名与学号）}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+本文针对具有高度非线性与强耦合特性的轮腿机器人，探讨了在外部干扰（不平整地面及水平推力）下的运动与姿态控制问题。基于“搬运菜品”这一高稳定性需求的实际应用场景，系统必须在实现 $0\sim5$ m/s 速度跟踪的同时，严格保证躯干竖直以及髋关节绝对高度的稳定，防止发生倾覆或抛洒。本文设计了一套统一的评价指标体系，并详细推导与设计了三种主流控制算法：线性二次型调节器（LQR）、基于二次规划的全身控制（WBC/QP）以及深度强化学习（RL）。最后，本文设计了三种严苛的干扰场景，对各算法的鲁棒性进行了全面的对比与理论分析。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{问题重述与评价指标体系}
+\subsection{系统描述与控制目标}
+本系统为一个在竖直平面内运动的轮腿机器人。其物理参数如下：躯干质量 $m = 50$ kg，大腿与小腿长度均为 $L_1 = L_2 = 0.5$ m（均假设无质量），轮足半径 $R = 0.1$ m（无质量）。系统的控制输入为三个关节的驱动力矩：$U = [\tau_{wheel}, \tau_{knee}, \tau_{hip}]^T$。题目并未给出执行器力矩上限，因此在后续仿真实验中将统一设定 $\tau_{max}$ 作为自定义硬件约束，并保证三类控制器在相同约束下进行比较。
+
+系统在运行过程中面临两种主要干扰：
+\begin{enumerate}
+    \item \textbf{地形干扰}：地面不再是绝对水平面，存在未知的起伏。
+    \item \textbf{外部推力干扰}：作用在躯干质心处的水平力 $F \le 100$ N。
+\end{enumerate}
+
+控制目标是在上述干扰下，使机器人能够在 $0\sim5$ m/s 的速度范围内稳定行驶，同时必须保证躯干姿态始终竖直，并尽量保持髋关节的绝对高度不变。
+
+\subsection{统一评价指标设计}
+为公平且定量地对比不同算法，结合“端菜”场景的物理需求，本文设计了以下核心评价指标：
+
+\begin{table}[H]
+    \centering
+    \caption{轮腿机器人控制算法评价指标体系}
+    \begin{tabular}{@{}p{2.9cm}p{4.0cm}p{6.4cm}p{1.4cm}@{}}
+        \toprule
+        \textbf{指标名称} & \textbf{物理意义} & \textbf{计算公式/描述} & \textbf{权重} \\ \midrule
+        绝对高度误差 & 衡量防打翻能力，要求髋关节绝对高度恒定 & $\text{RMSE}_h = \sqrt{\frac{1}{T}\int_0^T (y_{hip} - y_{ref})^2 dt}$ & 极高 \\
+        最大高度偏差 & 衡量是否出现瞬时越界或明显颠簸 & $e_{h,\max} = \max_{t\in[0,T]} |y_{hip}(t)-y_{ref}|$ & 极高 \\
+        躯干姿态平稳度 & 衡量防洒汤能力，要求躯干绝对竖直 & $\text{RMSE}_\theta = \sqrt{\frac{1}{T}\int_0^T \theta_t^2 dt}$ & 极高 \\
+        最大姿态角 & 衡量瞬态抗冲击能力与倾覆风险 & $\theta_{\max} = \max_{t\in[0,T]} |\theta_t(t)|$ & 极高 \\
+        速度跟踪误差 & 衡量运输效率及对速度指令的响应能力 & $\text{RMSE}_v = \sqrt{\frac{1}{T}\int_0^T (\dot{x}_{hip} - v_{cmd})^2 dt}$ & 高 \\
+        控制平顺性 & 衡量系统加速度变化率与乘载平稳性 & $J = \int_0^T \left(\|\dddot{p}_{hip}\|^2 + \lambda_\theta |\ddot{\theta}_t|^2\right) dt$ & 中 \\
+        能耗指标 & 衡量控制代价 & $E = \int_0^T \|\tau(t)\|^2 dt$ & 中 \\
+        力矩饱和比例 & 衡量控制器是否长期依赖硬件极限 & $\rho_{sat} = \frac{1}{3T}\sum_{i=1}^{3}\int_0^T \mathbb{I}(|\tau_i| \ge 0.98\tau_{max})dt$ & 中 \\
+        任务完成率 & 衡量算法在多场景下的可靠性 & 未触发失稳、接触失效、关节越界或求解失败的测试占比 & 极高 \\ \bottomrule
+    \end{tabular}
+\end{table}
+
+\subsection{失稳与任务失败判据}
+除连续指标外，本文还设置离散的任务失败判据，用于判断控制器是否已经不满足“端菜”任务的安全底线。若出现以下任一情况，则该次仿真记为失败：
+\begin{enumerate}
+    \item 躯干倾角超过安全阈值：$|\theta_t| > \theta_{fail}$。仿真中可取 $\theta_{fail}=30^\circ$，并在敏感性分析中检查阈值变化的影响。
+    \item 髋关节高度偏差超过容许范围：$|y_{hip}-y_{ref}| > h_{fail}$。仿真中可取 $h_{fail}=0.15$ m，体现菜品明显倾洒或腿部压缩过大的情况。
+    \item 腿部构型不可行：两连杆逆运动学无解、关节角超过设定范围，或所需腿长超过 $L_1+L_2$。
+    \item 轮地接触失效：法向接触力 $F_n < 0$、长时间离地，或切向力违反摩擦锥约束导致打滑。
+    \item 控制器求解失败：QP 不可行、RL 输出长期饱和，或任一执行器持续达到 $\tau_{max}$ 而无法恢复姿态。
+\end{enumerate}
+
+\section{方法一：基于 LQR 的局部最优控制设计}
+线性二次型调节器（LQR）是一种经典的基于模型的工作点局部最优控制方法。通过对复杂的非线性动力学模型进行泰勒展开，可以在特定的平衡态附近实现最优调节。
+
+\subsection{非线性动力学建模}
+选取系统的广义坐标为 $q = [x_w, \theta_1, \theta_2, \theta_t]^T$，分别表示轮心水平位置、大腿相对于竖直方向的夹角、小腿相对于大腿的夹角、以及躯干的倾斜角。
+
+根据拉格朗日法，系统的动力学方程可写为标准形式：
+$$ M(q)\ddot{q} + C(q, \dot{q})\dot{q} + G(q) = S U + J_{ext}^T F_{ext} $$
+其中：
+\begin{itemize}
+    \item $M(q) \in \mathbb{R}^{4 \times 4}$ 为正定对称的惯性质量矩阵。
+    \item $C(q, \dot{q}) \in \mathbb{R}^{4 \times 4}$ 为科氏力与离心力矩阵。
+    \item $G(q) \in \mathbb{R}^{4 \times 1}$ 为重力向量。
+    \item $S \in \mathbb{R}^{4 \times 3}$ 为控制输入映射矩阵，$U = [\tau_{wheel}, \tau_{knee}, \tau_{hip}]^T$。
+    \item $J_{ext}$ 为外部力 $F_{ext}$ 作用点的雅可比矩阵。
+\end{itemize}
+
+\textbf{物理模型修正：} 题目假定大腿、小腿及车轮均无质量。若直接建立全状态动力学模型，系统质量会高度集中于躯干或髋关节附近，惯性矩阵可能出现秩亏或严重病态。为保证正向动力学可计算，可在仿真模型中引入极小的车轮等效质量与关节转子惯量作为数值正则化项。该处理不改变“腿部极轻”的主要物理含义，但能避免 $M(q)^{-1}$ 求解时发生数值爆炸。
+
+\subsection{工作点线性化}
+定义状态向量 $X = [q^T, \dot{q}^T]^T \in \mathbb{R}^{8 \times 1}$。系统状态方程为 $\dot{X} = f(X, U, F_{ext})$。
+选取目标工作点 $X^*$ 为：机器人在平整地面以速度 $v_{cmd}$ 匀速行驶，躯干直立（$\theta_t = 0, \dot{\theta}_t = 0$），腿部关节保持恒定构型以维持期望高度 $y_{ref}$，且无外部干扰（$F_{ext} = 0$）。
+
+在工作点 $(X^*, U^*)$ 处进行一阶泰勒展开，得到误差状态方程：
+$$ \Delta \dot{X} = A \Delta X + B \Delta U $$
+其中，$A = \frac{\partial f}{\partial X}\Big|_{X^*, U^*}$，$B = \frac{\partial f}{\partial U}\Big|_{X^*, U^*}$。
+
+由于系统在水平方向具有平移不变性，绝对位置 $x_w$ 本身通常不会影响重力项和内部约束，因此线性化后的 $A$ 矩阵可能存在原点附近的临界模态。实际求解 LQR 时，可采用速度跟踪误差而非绝对位置误差作为主要状态，或引入极小的阻尼/正则化项，使代数黎卡提方程具有良好的数值条件。
+
+\subsection{控制器设计}
+设计二次型代价函数：
+$$ J_{LQR} = \int_{0}^{\infty} (\Delta X^T Q \Delta X + \Delta U^T R \Delta U) dt $$
+在 $Q$ 矩阵的设计中，为了满足大作业要求，我们对躯干角度偏差 $\Delta \theta_t$ 和影响高度的关节角度偏差赋予极大的惩罚权重（如 $10^4$ 量级）。求解代数黎卡提方程（ARE）得到最优反馈增益 $K$。
+控制律为：$U = \text{Clip}(U^* - K(X - X^*), -\tau_{max}, \tau_{max})$。
+
+\textbf{局限性预判}：LQR 极度依赖线性化工作点。当面临地面起伏导致腿部构型大幅改变，或者受到超过 100N 的大推力导致躯干产生较大倾角时，系统状态偏离平衡点较远，LQR 的线性化假设失效，极易导致控制发散。
+
+\section{方法二：基于二次规划的全身控制设计 (QP/WBC)}
+为了克服 LQR 无法处理硬约束和复杂非线性地形的问题，本文引入基于二次规划（QP）的全身控制（Whole-Body Control）。该方法在每个控制周期内求解一个带约束的优化问题，非常适合“端菜”这种具有严格物理约束的任务。
+
+\subsection{任务空间定义与优先级划分}
+将控制目标转化为任务空间（Task Space）中的轨迹跟踪，并按照重要性严格划分优先级：
+\begin{itemize}
+    \item \textbf{任务 1（最高优先级，安全任务）}：保持髋关节绝对高度 $y_{hip} = y_{ref}$，保持躯干完全竖直 $\theta_t = 0$。这是“不打翻”的核心底线。
+    \item \textbf{任务 2（次优先级，运动任务）}：质心水平速度跟踪期望指令 $\dot{x}_{hip} = v_{cmd}$。
+\end{itemize}
+
+针对每个任务，设计基于 PD 规律的期望任务空间加速度：
+$$ \ddot{X}_{des, i} = \ddot{X}_{ref, i} + K_{P,i}(X_{ref, i} - X_i) + K_{D,i}(\dot{X}_{ref, i} - \dot{X}_i) $$
+
+\subsection{QP 优化问题构建}
+以关节角加速度 $\ddot{q}$、接触力 $F_c$ 和关节力矩 $\tau$ 为优化变量，构建如下二次规划问题：
+
+\textbf{目标函数}（最小化任务跟踪误差及力矩消耗）：
+$$ \min_{\ddot{q}, F_c, \tau} \sum_{i=1}^{2} \omega_i \left\| J_i \ddot{q} + \dot{J}_i \dot{q} - \ddot{X}_{des, i} \right\|^2 + \omega_u \|\tau\|^2 $$
+其中 $\omega_1 \gg \omega_2$ 以体现优先级，$\omega_u$ 为能量权重。
+
+\textbf{约束条件}：
+\begin{enumerate}
+    \item \textbf{系统动力学等式约束}：$M(q)\ddot{q} + C(q, \dot{q})\dot{q} + G(q) = S\tau + J_c^T F_c + J_{ext}^T F_{ext}$。
+    \item \textbf{地形接触约束}：轮心高度必须满足 $y_w = h_g(x_w) + R$，其中 $h_g(x)$ 为地面高度函数；在加速度层面对应 $J_c(q)\ddot{q}+\dot{J}_c(q,\dot{q})\dot{q}=\ddot{x}_{terrain}$。
+    \item \textbf{非穿透与单边接触约束}：法向接触力满足 $F_n \ge 0$，防止优化器产生不物理的“拉地面”接触力。
+    \item \textbf{摩擦锥约束（防打滑）}：$|F_t| \le \mu F_n$，其中 $\mu$ 为车轮与地面摩擦系数，$F_t$ 与 $F_n$ 分别为切向和法向接触力。
+    \item \textbf{滚动约束}：若显式引入车轮转角 $\phi_w$，则需满足无滑滚动关系 $\dot{x}_w = R\dot{\phi}_w$；若不引入 $\phi_w$，则将轮端切向驱动力作为等效输入，并在摩擦锥内限制其大小。
+    \item \textbf{关节范围与腿长约束}：膝关节、髋关节角度不得超过机械限位，且期望髋部高度必须处于两连杆可达空间内。
+    \item \textbf{力矩极限约束（自定义硬件限制）}：$-\tau_{max} \le \tau_i \le \tau_{max}$。$\tau_{max}$ 不来自题目给定，而是在仿真中统一设定，用于公平比较三种控制器。
+\end{enumerate}
+
+\textbf{算法优势}：当遇到不平整地面时，QP 优化器能够自动利用运动学雅可比矩阵 $J$ 求解出双腿的伸缩策略（即调整 $\alpha_1, \alpha_2$），以吸收地形高低差，完美隔离地形扰动对躯干高度和姿态的影响。
+
+\section{方法三：基于深度强化学习的控制设计 (RL)}
+传统的模型控制高度依赖于精确的参数和环境感知。本文进一步引入无模型的深度强化学习（Reinforcement Learning, RL），采用 PPO（Proximal Policy Optimization）算法，通过大规模仿真试错获取高鲁棒性的神经网络控制策略。
+
+\subsection{MDP 模型构建}
+\begin{itemize}
+    \item \textbf{状态空间 (Observation $\mathcal{S}$)}：包含本体感知数据（关节角度与速度、车轮线速度、IMU 反馈的躯干倾角及角速度）和任务指令（目标速度 $v_{cmd}$）。
+    \item \textbf{动作空间 (Action $\mathcal{A}$)}：策略网络直接输出归一化后的关节驱动力矩 $a_t \in [-1, 1]^3$，经过比例缩放映射到真实的力矩输出 $\tau = a_t \cdot \tau_{max}$。
+    \item \textbf{奖励函数 (Reward $\mathcal{R}$)}：奖励函数的设计直接决定了“端菜”任务的成败。采用严格的指数惩罚形式：
+    $$ r = r_{pose} + r_{height} + r_{vel} + r_{torque} + r_{sat} + r_{fail} $$
+    其中：
+    $$ r_{pose} = w_1 \exp(-k_1 \theta_t^2) \quad \text{(躯干直立奖励)} $$
+    $$ r_{height} = w_2 \exp(-k_2 (y_{hip} - y_{ref})^2) \quad \text{(定高奖励)} $$
+    $$ r_{vel} = w_3 \exp(-k_3 (\dot{x} - v_{cmd})^2) \quad \text{(速度跟踪奖励)} $$
+    $$ r_{torque} = - w_4 \|\tau\|^2 \quad \text{(能耗惩罚)} $$
+    $$ r_{sat} = - w_5 \rho_{sat}, \quad r_{fail} =
+    \begin{cases}
+    -w_6, & \text{触发失稳或接触失败} \\
+    0, & \text{否则}
+    \end{cases} $$
+\end{itemize}
+
+\subsection{域随机化 (Domain Randomization)}
+为了提高策略面对题干中所述干扰的鲁棒性，在训练过程中引入域随机化技术：随机改变地形起伏的高度（$\pm 0.1$m）、随机改变地面的摩擦系数、在躯干质心施加随机大小和方向的力（模拟 $F \le 100$N 的干扰）。使神经网络学习到在各种极端条件下的隐式重力补偿与姿态恢复策略。
+
+\section{鲁棒性分析与对比仿真方案}
+为全面评估上述三种控制算法的实际性能，本文设计了三种典型的干扰仿真实验环境进行鲁棒性压测。
+
+\subsection{统一仿真设置与输出内容}
+为保证对比结果公平，三类控制器必须使用相同的机器人参数、地形函数、外力时序、采样周期、力矩上限 $\tau_{max}$ 和失败判据。速度指令 $v_{cmd}$ 采用平滑阶跃或斜坡输入，避免由不连续指令本身引入无意义的瞬时冲击。每次仿真保存如下数据：髋关节位置与速度、躯干角与角速度、三个关节力矩、接触力、地形高度、外部扰动力以及控制器求解状态。
+
+最终结果以两种形式呈现：一是每个场景下 $y_{hip}$、$\theta_t$、$\dot{x}_{hip}$ 和 $\tau$ 的时间曲线；二是汇总表格，列出 $\text{RMSE}_h$、$e_{h,\max}$、$\text{RMSE}_\theta$、$\theta_{\max}$、$\text{RMSE}_v$、$J$、$E$、$\rho_{sat}$ 和任务是否成功。这样既能看出控制过程的瞬态细节，也能用统一指标完成横向比较。
+
+\subsection{测试场景 A：瞬态强冲击干扰}
+\textbf{环境设置}：机器人在平坦地面以 $2$ m/s 匀速行驶。在 $t=5$ s 时，在躯干质心施加大小为 $100$ N，持续时间为 $0.1$ s 的瞬时水平脉冲力 $F$。 \\
+\textbf{理论分析与预期}：
+\begin{itemize}
+    \item \textbf{LQR}：由于冲击导致状态偏离工作点，躯干会产生剧烈的瞬态晃动（$\theta$ 变大），恢复时间较长，甚至可能出现震荡。
+    \item \textbf{QP / RL}：QP 的动力学约束中显式包含了力矩限制，将以最大可用力矩快速抵消冲击；RL 基于在类似冲击中训练的经验，预期能展现出最小的峰值偏离角和最快的收敛速度。
+\end{itemize}
+
+\subsection{测试场景 B：持续恒定推力干扰}
+\textbf{环境设置}：机器人在平坦地面以 $3$ m/s 行驶，躯干质心受到 $80$ N 的持续水平力（模拟逆风或持续推拽）。 \\
+\textbf{理论分析与预期}：
+\begin{itemize}
+    \item \textbf{LQR}：标准 LQR 控制器无法消除恒定干扰带来的稳态误差，躯干将被迫维持一个非零的倾角才能达到受力平衡，无法满足“端菜”的绝对竖直要求。
+    \item \textbf{QP / RL}：QP 若在动力学方程中未能精确估计外部力，也会产生偏差；但可通过引入动量观测器估计 $F_{ext}$ 并作为前馈补偿。RL 通过神经网络的非线性映射能力，可自动学习出身体前倾产生反向力矩或加速车轮的补偿策略。
+\end{itemize}
+
+\subsection{测试场景 C：连续恶劣地形测试}
+\textbf{环境设置}：地面设置为振幅 $0.05$ m，波长 $1$ m 的正弦波形或柏林噪声地面。 \\
+\textbf{理论分析与预期}：
+\begin{itemize}
+    \item \textbf{LQR}：几乎必然失效。高度 $y_{hip}$ 将随地面起伏而剧烈波动，RMSE\_h 指标极差。
+    \item \textbf{QP}：表现最佳。依靠精确的运动学逆解，膝关节与髋关节将快速联动，车轮随波峰波谷上下移动，而髋部犹如被固定在滑轨上一般保持绝对高度不变。
+    \item \textbf{RL}：高度表现优异，但相比于 QP 的解析计算，可能会有轻微的神经元输出噪声导致的高频微小抖动（Jerk 指标略低于 QP）。
+\end{itemize}
+
+\section{总结}
+针对轮腿机器人的复杂操作需求，本文详细设计了三种控制框架。对比发现：LQR 虽然计算效率极高，但面对地形与强力干扰时表现羸弱，不适合复杂实景；QP/WBC 方法在物理模型精确的前提下，展现了最优的物理极限压榨能力和极致的地形隔离能力，是完成该“端菜”任务的理论最优解；而深度强化学习方法无需精确模型，抗干扰鲁棒性极强，是未来应对非结构化环境的潜力方向。
+
+\end{document}
