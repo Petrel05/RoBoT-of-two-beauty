@@ -20,6 +20,9 @@ class RobotParams:
     tau_limits: np.ndarray = field(
         default_factory=lambda: np.array([30.0, 160.0, 120.0], dtype=float)
     )
+    rl_residual_scale: np.ndarray = field(
+        default_factory=lambda: np.array([5.0, 25.0, 25.0], dtype=float)
+    )
 
 
 @dataclass(frozen=True)
@@ -41,4 +44,3 @@ class SafetyLimits:
 ROBOT = RobotParams()
 SIM = SimParams()
 SAFETY = SafetyLimits()
-

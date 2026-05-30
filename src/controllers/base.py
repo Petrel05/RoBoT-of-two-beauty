@@ -35,3 +35,49 @@ def equilibrium_torque(v_cmd: float, params: RobotParams) -> np.ndarray:
 def clip_tau(tau: np.ndarray, params: RobotParams) -> np.ndarray:
     return np.clip(np.asarray(tau, dtype=float), -params.tau_limits, params.tau_limits)
 
+
+def residual_torque_action(
+    action: np.ndarray,
+    state: np.ndarray,
+    v_cmd: float,
+    y_ref: float,
+    params: RobotParams,
+    external_force_x: float = 0.0,
+) -> np.ndarray:
+    action = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
+    base = stabilizing_baseline_torque(state, v_cmd, y_ref, params, external_force_x)
+    tau = base + action * params.rl_residual_scale
+    return clip_tau(tau, params)
+
+
+def direct_torque_action(action: np.ndarray, params: RobotParams) -> np.ndarray:
+    action = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
+    tau_wheel = action[0] * params.tau_limits[0]
+    # The knee actuator is modeled as the main leg-extension actuator, so the
+    # direct policy controls its full usable range [0, tau_max] instead of a
+    # symmetric pull/push range. It still outputs the complete torque command.
+    tau_knee = 0.5 * (action[1] + 1.0) * params.tau_limits[1]
+    tau_hip = action[2] * params.tau_limits[2]
+    return clip_tau(np.array([tau_wheel, tau_knee, tau_hip], dtype=float), params)
+
+
+def stabilizing_baseline_torque(
+    state: np.ndarray,
+    v_cmd: float,
+    y_ref: float,
+    params: RobotParams,
+    external_force_x: float = 0.0,
+) -> np.ndarray:
+    _x, y, theta, vx, vy, omega = np.asarray(state, dtype=float)
+
+    ax_cmd = 3.0 * (v_cmd - vx) - external_force_x / max(params.mass, 1.0)
+    tau_wheel = params.wheel_radius * (params.x_damping * v_cmd + params.mass * ax_cmd)
+
+    ay_cmd = 70.0 * (y_ref - y) - 16.0 * vy
+    f_leg = params.mass * (params.gravity + ay_cmd)
+    f_leg = max(f_leg, 0.0)
+
+    alpha_cmd = 85.0 * (0.0 - theta) - 18.0 * omega
+    hip = params.body_inertia * alpha_cmd - 0.25 * external_force_x * max(y, 0.1)
+    knee = f_leg * params.leg_moment_arm - 0.6 * hip
+    return clip_tau(np.array([tau_wheel, knee, hip], dtype=float), params)

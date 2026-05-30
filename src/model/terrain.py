@@ -38,17 +38,50 @@ class FlatTerrain(Terrain):
 class SineTerrain(Terrain):
     amplitude: float = 0.05
     wavelength: float = 1.0
+    phase: float = 0.0
 
     def height(self, x: float) -> float:
-        return float(self.amplitude * np.sin(2.0 * np.pi * x / self.wavelength))
+        return float(
+            self.amplitude * np.sin(2.0 * np.pi * x / self.wavelength + self.phase)
+        )
 
     def slope(self, x: float) -> float:
         k = 2.0 * np.pi / self.wavelength
-        return float(self.amplitude * k * np.cos(k * x))
+        return float(self.amplitude * k * np.cos(k * x + self.phase))
 
     def curvature(self, x: float) -> float:
         k = 2.0 * np.pi / self.wavelength
-        return float(-self.amplitude * k * k * np.sin(k * x))
+        return float(-self.amplitude * k * k * np.sin(k * x + self.phase))
+
+
+@dataclass(frozen=True)
+class MultiSineTerrain(Terrain):
+    amplitudes: np.ndarray
+    wavelengths: np.ndarray
+    phases: np.ndarray
+    max_abs_height: float = 0.06
+
+    def _raw(self, x: float) -> tuple[float, float, float]:
+        h = 0.0
+        s = 0.0
+        c = 0.0
+        for amp, wave, phase in zip(self.amplitudes, self.wavelengths, self.phases):
+            k = 2.0 * np.pi / wave
+            arg = k * x + phase
+            h += amp * np.sin(arg)
+            s += amp * k * np.cos(arg)
+            c -= amp * k * k * np.sin(arg)
+        scale = min(1.0, self.max_abs_height / max(np.sum(np.abs(self.amplitudes)), 1e-9))
+        return float(scale * h), float(scale * s), float(scale * c)
+
+    def height(self, x: float) -> float:
+        return self._raw(x)[0]
+
+    def slope(self, x: float) -> float:
+        return self._raw(x)[1]
+
+    def curvature(self, x: float) -> float:
+        return self._raw(x)[2]
 
 
 @dataclass(frozen=True)
@@ -71,3 +104,8 @@ class NoiseTerrain(Terrain):
     def height(self, x: float) -> float:
         return float(np.interp(x, self._xs, self._values))
 
+    def slope(self, x: float) -> float:
+        return super().slope(x)
+
+    def curvature(self, x: float) -> float:
+        return super().curvature(x)

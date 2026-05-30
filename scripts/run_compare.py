@@ -11,14 +11,24 @@ if str(PROJECT_ROOT) not in sys.path:
 from src.config.params import ROBOT, SAFETY, SIM
 from src.config.scenarios import default_scenarios
 from src.controllers.lqr import LQRController
-from src.controllers.rl_policy import RandomPolicyController, TrainedPPOController
+from src.controllers.rl_policy import (
+    DirectPPOController,
+    RandomPolicyController,
+    TrainedPPOController,
+)
 from src.controllers.wbc_qp import WBCQPController
 from src.evaluation.metrics import compute_metrics, format_metrics_table
 from src.evaluation.plots import plot_log
 from src.simulation.runner import SimulationRunner
 
 
-def build_controller(name: str, scenario, model_path: str | None = None):
+def build_controller(
+    name: str,
+    scenario,
+    model_path: str | None = None,
+    residual_model_path: str | None = None,
+    direct_model_path: str | None = None,
+):
     if name == "lqr":
         return LQRController(ROBOT, SIM.y_ref)
     if name == "wbc_qp":
@@ -26,9 +36,15 @@ def build_controller(name: str, scenario, model_path: str | None = None):
     if name == "rl_random":
         return RandomPolicyController(ROBOT, seed=0)
     if name == "rl_ppo":
-        if not model_path:
+        path = residual_model_path or model_path
+        if not path:
             raise ValueError("--model-path is required for rl_ppo")
-        return TrainedPPOController(model_path, ROBOT, scenario.terrain)
+        return TrainedPPOController(path, ROBOT, scenario.terrain)
+    if name == "rl_ppo_direct":
+        path = direct_model_path or model_path
+        if not path:
+            raise ValueError("--direct-model-path or --model-path is required for rl_ppo_direct")
+        return DirectPPOController(path, ROBOT, scenario.terrain)
     raise ValueError(f"Unknown controller: {name}")
 
 
@@ -38,9 +54,11 @@ def main() -> None:
         "--controllers",
         nargs="+",
         default=["lqr", "wbc_qp", "rl_random"],
-        choices=["lqr", "wbc_qp", "rl_random", "rl_ppo"],
+        choices=["lqr", "wbc_qp", "rl_random", "rl_ppo", "rl_ppo_direct"],
     )
     parser.add_argument("--model-path", default=None)
+    parser.add_argument("--residual-model-path", default=None)
+    parser.add_argument("--direct-model-path", default=None)
     parser.add_argument("--out-dir", default="outputs")
     parser.add_argument(
         "--continue-after-failure",
@@ -59,7 +77,13 @@ def main() -> None:
     rows = []
     for scenario in default_scenarios():
         for controller_name in args.controllers:
-            controller = build_controller(controller_name, scenario, args.model_path)
+            controller = build_controller(
+                controller_name,
+                scenario,
+                model_path=args.model_path,
+                residual_model_path=args.residual_model_path,
+                direct_model_path=args.direct_model_path,
+            )
             log = runner.run(
                 controller,
                 scenario,

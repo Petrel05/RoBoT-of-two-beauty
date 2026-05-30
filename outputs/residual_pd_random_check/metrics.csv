@@ -1,0 +1,5 @@
+controller,scenario,success,rmse_h,max_abs_h,rmse_theta_deg,max_abs_theta_deg,rmse_v,sat_ratio,failure_reason
+rl_random,A_impulse_push,1,0.000739673,0.00212912,2.53834,2.78227,0.197895,0,none
+rl_random,B_constant_push,1,0.000739673,0.00212912,2.46669,2.70816,0.298037,0,none
+rl_random,C_rough_terrain,1,0.00682011,0.0145229,2.56859,2.94328,0.455664,0.0507699,none
+rl_random,C_noise_terrain,1,0.000901966,0.00258057,2.5418,2.77655,0.19109,0,none
