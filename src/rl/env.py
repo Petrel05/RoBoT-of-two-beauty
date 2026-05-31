@@ -31,6 +31,7 @@ class WheelLegRobotEnv(gym.Env):
         safety: SafetyLimits = SAFETY,
         seed: int | None = None,
         action_mode: str = "residual",
+        provide_force_measurement: bool = False,
     ):
         super().__init__()
         if action_mode not in {"residual", "direct"}:
@@ -39,6 +40,7 @@ class WheelLegRobotEnv(gym.Env):
         self.sim = sim
         self.safety = safety
         self.action_mode = action_mode
+        self.provide_force_measurement = provide_force_measurement
         self.scenarios = scenarios or default_scenarios()
         self.scenario_sampler = scenario_sampler
         self.rng = np.random.default_rng(seed)
@@ -83,8 +85,14 @@ class WheelLegRobotEnv(gym.Env):
         v_cmd = self.scenario.v_cmd(self.t)
         force_x = self.scenario.force_x(self.t)
         if self.action_mode == "residual":
+            measured_force_x = force_x if self.provide_force_measurement else 0.0
             tau = residual_torque_action(
-                action, self.state, v_cmd, self.sim.y_ref, self.params, force_x
+                action,
+                self.state,
+                v_cmd,
+                self.sim.y_ref,
+                self.params,
+                measured_force_x,
             )
         else:
             tau = direct_torque_action(action, self.params)

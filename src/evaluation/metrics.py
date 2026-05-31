@@ -29,7 +29,7 @@ def compute_metrics(log: SimulationLog, params: RobotParams) -> dict[str, float 
     theta_acc = data["alpha"]
     jerk_score = _trapz(jerk_trans * jerk_trans + 0.1 * theta_acc * theta_acc, t)
 
-    return {
+    metrics: dict[str, float | str] = {
         "success": 1.0 if not log.failure_reason else 0.0,
         "failure_reason": log.failure_reason or "none",
         "duration": float(duration),
@@ -43,6 +43,37 @@ def compute_metrics(log: SimulationLog, params: RobotParams) -> dict[str, float 
         "sat_ratio": float(np.mean(sat)),
         "mean_tau_norm": float(np.mean(np.linalg.norm(tau, axis=1))),
     }
+    if "qp_success" in data:
+        valid_qp = np.isfinite(data["qp_success"])
+        if np.any(valid_qp):
+            metrics.update(
+                {
+                    "qp_success_ratio": float(np.mean(data["qp_success"][valid_qp])),
+                    "qp_solver_success_ratio": float(
+                        np.mean(data["qp_solver_success"][valid_qp])
+                    ),
+                    "qp_fallback_ratio": float(np.mean(data["qp_fallback"][valid_qp])),
+                    "mean_qp_iterations": float(
+                        np.mean(data["qp_iterations"][valid_qp])
+                    ),
+                    "max_qp_eq_residual": float(
+                        np.max(data["qp_eq_residual"][valid_qp])
+                    ),
+                    "max_qp_ineq_violation": float(
+                        np.max(data["qp_ineq_violation"][valid_qp])
+                    ),
+                    "max_qp_friction_ratio": float(
+                        np.max(data["qp_friction_ratio"][valid_qp])
+                    ),
+                    "max_qp_leg_slack": float(
+                        np.max(data["qp_leg_slack"][valid_qp])
+                    ),
+                    "max_qp_height_slack": float(
+                        np.max(data["qp_height_slack"][valid_qp])
+                    ),
+                }
+            )
+    return metrics
 
 
 def format_metrics_table(rows: list[dict[str, float | str]]) -> str:
@@ -57,6 +88,15 @@ def format_metrics_table(rows: list[dict[str, float | str]]) -> str:
         "rmse_v",
         "sat_ratio",
         "failure_reason",
+        "qp_success_ratio",
+        "qp_solver_success_ratio",
+        "qp_fallback_ratio",
+        "mean_qp_iterations",
+        "max_qp_eq_residual",
+        "max_qp_ineq_violation",
+        "max_qp_friction_ratio",
+        "max_qp_leg_slack",
+        "max_qp_height_slack",
     ]
     lines = [",".join(headers)]
     for row in rows:

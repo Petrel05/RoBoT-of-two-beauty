@@ -10,6 +10,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from src.config.random_scenarios import training_sampler
 from src.config.scenarios import training_scenarios
+from src.controllers.rl_policy import load_ppo_model
 from src.rl.env import WheelLegRobotEnv
 
 
@@ -21,6 +22,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n-envs", type=int, default=4)
     parser.add_argument("--device", default="auto")
+    parser.add_argument(
+        "--provide-force-measurement",
+        action="store_true",
+        help="Provide exact horizontal disturbances to residual baselines during training.",
+    )
     parser.add_argument("--action-mode", choices=["residual", "direct"], default="residual")
     parser.add_argument(
         "--scenario-set",
@@ -65,6 +71,7 @@ def main() -> None:
                     scenario_sampler=sampler,
                     seed=args.seed + rank,
                     action_mode=args.action_mode,
+                    provide_force_measurement=args.provide_force_measurement,
                 )
             )
 
@@ -72,7 +79,7 @@ def main() -> None:
 
     env = DummyVecEnv([make_env(i) for i in range(args.n_envs)])
     if args.load_path:
-        model = PPO.load(args.load_path, env=env, device=args.device)
+        model = load_ppo_model(args.load_path, env=env, device=args.device)
         model.verbose = 1
     else:
         ent_coef = 0.003 if args.action_mode == "residual" else 0.008

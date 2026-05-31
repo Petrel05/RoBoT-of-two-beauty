@@ -1,5 +1,0 @@
-controller,scenario,success,rmse_h,max_abs_h,rmse_theta_deg,max_abs_theta_deg,rmse_v,sat_ratio,failure_reason
-rl_ppo_direct,A_impulse_push,1,0.0024566,0.00396925,0.176188,0.497943,0.0344069,0,none
-rl_ppo_direct,B_constant_push,1,0.00218485,0.00234412,0.252727,0.682471,0.0230732,0,none
-rl_ppo_direct,C_rough_terrain,1,0.00494035,0.00896969,0.276923,0.495754,0.0341436,0,none
-rl_ppo_direct,C_noise_terrain,1,0.00390417,0.00757997,0.189896,0.300902,0.0327114,0,none

@@ -18,7 +18,7 @@ from src.controllers.rl_policy import (
 )
 from src.controllers.wbc_qp import WBCQPController
 from src.evaluation.metrics import compute_metrics, format_metrics_table
-from src.evaluation.plots import plot_log
+from src.evaluation.plots import plot_log, plot_wbc_diagnostics
 from src.simulation.runner import SimulationRunner
 
 
@@ -32,7 +32,7 @@ def build_controller(
     if name == "lqr":
         return LQRController(ROBOT, SIM.y_ref)
     if name == "wbc_qp":
-        return WBCQPController(ROBOT, scenario.terrain)
+        return WBCQPController(ROBOT, scenario.terrain, SAFETY, dt=SIM.dt)
     if name == "rl_random":
         return RandomPolicyController(ROBOT, seed=0)
     if name == "rl_ppo":
@@ -61,6 +61,11 @@ def main() -> None:
     parser.add_argument("--direct-model-path", default=None)
     parser.add_argument("--out-dir", default="outputs")
     parser.add_argument(
+        "--provide-force-measurement",
+        action="store_true",
+        help="Provide the exact horizontal disturbance to controllers that support it.",
+    )
+    parser.add_argument(
         "--continue-after-failure",
         action="store_true",
         help="Keep simulating after a failure is first detected.",
@@ -73,7 +78,13 @@ def main() -> None:
     fig_dir.mkdir(parents=True, exist_ok=True)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    runner = SimulationRunner(ROBOT, SAFETY, dt=SIM.dt, y_ref=SIM.y_ref)
+    runner = SimulationRunner(
+        ROBOT,
+        SAFETY,
+        dt=SIM.dt,
+        y_ref=SIM.y_ref,
+        provide_force_measurement=args.provide_force_measurement,
+    )
     rows = []
     for scenario in default_scenarios():
         for controller_name in args.controllers:
@@ -99,6 +110,13 @@ def main() -> None:
             stem = f"{scenario.name}__{controller.name}"
             log.save_npz(str(log_dir / f"{stem}.npz"))
             plot_log(log, f"{scenario.name} / {controller.name}", fig_dir / f"{stem}.png")
+            plot_wbc_diagnostics(
+                log,
+                ROBOT,
+                SAFETY,
+                f"{scenario.name} / {controller.name} constraints",
+                fig_dir / f"{stem}__diagnostics.png",
+            )
             print(f"finished {stem}: success={row['success']} reason={row['failure_reason']}")
 
     table = format_metrics_table(rows)

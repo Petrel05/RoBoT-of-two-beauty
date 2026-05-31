@@ -24,11 +24,21 @@ class Controller:
     def compute(self, state: np.ndarray, context: ControlContext) -> np.ndarray:
         raise NotImplementedError
 
+    def diagnostics(self) -> dict[str, float]:
+        return {}
+
 
 def equilibrium_torque(v_cmd: float, params: RobotParams) -> np.ndarray:
     tau_wheel = params.x_damping * v_cmd * params.wheel_radius
-    knee = params.mass * params.gravity * params.leg_moment_arm / 0.91
-    hip = -0.15 * knee
+    contact_tangent = tau_wheel / params.wheel_radius
+    contact_moment_arm = params.contact_pitch_coupling * (
+        params.nominal_leg_length + params.wheel_radius
+    )
+    knee, hip = distribute_leg_torque(
+        active_leg_force=params.mass * params.gravity,
+        joint_pitch_moment=-contact_moment_arm * contact_tangent,
+        params=params,
+    )
     return np.array([tau_wheel, knee, hip], dtype=float)
 
 
@@ -61,6 +71,20 @@ def direct_torque_action(action: np.ndarray, params: RobotParams) -> np.ndarray:
     return clip_tau(np.array([tau_wheel, tau_knee, tau_hip], dtype=float), params)
 
 
+def distribute_leg_torque(
+    active_leg_force: float,
+    joint_pitch_moment: float,
+    params: RobotParams,
+) -> tuple[float, float]:
+    matrix = np.array([[1.0, 0.6], [0.15, 1.0]], dtype=float)
+    rhs = np.array(
+        [params.leg_moment_arm * active_leg_force, joint_pitch_moment],
+        dtype=float,
+    )
+    knee, hip = np.linalg.solve(matrix, rhs)
+    return float(knee), float(hip)
+
+
 def stabilizing_baseline_torque(
     state: np.ndarray,
     v_cmd: float,
@@ -78,6 +102,13 @@ def stabilizing_baseline_torque(
     f_leg = max(f_leg, 0.0)
 
     alpha_cmd = 85.0 * (0.0 - theta) - 18.0 * omega
-    hip = params.body_inertia * alpha_cmd - 0.25 * external_force_x * max(y, 0.1)
-    knee = f_leg * params.leg_moment_arm - 0.6 * hip
+    contact_tangent = tau_wheel / params.wheel_radius
+    contact_moment_arm = params.contact_pitch_coupling * max(y, 0.1)
+    joint_pitch_moment = (
+        params.body_inertia * alpha_cmd
+        + params.theta_stiffness * theta
+        + params.theta_damping * omega
+        - contact_moment_arm * contact_tangent
+    )
+    knee, hip = distribute_leg_torque(f_leg, joint_pitch_moment, params)
     return clip_tau(np.array([tau_wheel, knee, hip], dtype=float), params)

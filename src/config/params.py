@@ -17,6 +17,10 @@ class RobotParams:
     theta_damping: float = 2.8
     theta_stiffness: float = 18.0
     leg_moment_arm: float = 0.25
+    nominal_leg_length: float = 0.72
+    leg_stiffness: float = 900.0
+    leg_damping: float = 55.0
+    contact_pitch_coupling: float = 0.25
     tau_limits: np.ndarray = field(
         default_factory=lambda: np.array([30.0, 160.0, 120.0], dtype=float)
     )

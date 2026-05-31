@@ -118,6 +118,22 @@ def default_scenarios() -> list[Scenario]:
             ),
             description="3 m/s with 60 N constant push, 100 N impulse, and large irregular terrain.",
         ),
+        Scenario(
+            name="F_high_speed_flat",
+            duration=8.0,
+            v_cmd=smooth_speed(5.0),
+            force_x=no_force,
+            terrain=FlatTerrain(),
+            description="Upper-bound 5 m/s tracking on flat ground.",
+        ),
+        Scenario(
+            name="G_requirement_boundary",
+            duration=8.0,
+            v_cmd=smooth_speed(5.0),
+            force_x=constant_force(100.0),
+            terrain=SineTerrain(amplitude=0.05, wavelength=1.0),
+            description="Requirement-boundary test: 5 m/s, 100 N push, and uneven terrain.",
+        ),
     ]
 
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from scipy.interpolate import CubicSpline
 
 
 class Terrain:
@@ -99,13 +100,16 @@ class NoiseTerrain(Terrain):
         for _ in range(4):
             values = np.convolve(values, kernel, mode="same")
         object.__setattr__(self, "_xs", xs)
-        object.__setattr__(self, "_values", values)
+        object.__setattr__(self, "_spline", CubicSpline(xs, values, bc_type="natural"))
 
     def height(self, x: float) -> float:
-        return float(np.interp(x, self._xs, self._values))
+        return float(self._spline(self._clipped_x(x)))
 
     def slope(self, x: float) -> float:
-        return super().slope(x)
+        return float(self._spline(self._clipped_x(x), 1))
 
     def curvature(self, x: float) -> float:
-        return super().curvature(x)
+        return float(self._spline(self._clipped_x(x), 2))
+
+    def _clipped_x(self, x: float) -> float:
+        return float(np.clip(x, self._xs[0], self._xs[-1]))
