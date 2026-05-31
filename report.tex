@@ -1,200 +1,1135 @@
+% !TeX program = xelatex
 \documentclass[12pt, a4paper]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[fontset=fandol]{ctex} % 支持中文，并使用 TeXLive 自带中文字体
-\usepackage{amsmath, amssymb, amsfonts}
+
+\usepackage[fontset=fandol]{ctex}
+\usepackage{amsmath, amssymb, amsfonts, mathtools}
 \usepackage{graphicx}
 \usepackage{geometry}
 \usepackage{float}
 \usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{subcaption}
 \usepackage{xcolor}
 \usepackage{hyperref}
-\geometry{left=2.5cm, right=2.5cm, top=2.5cm, bottom=2.5cm}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
 
-\title{\textbf{控制部分大作业二：轮腿机器人姿态与运动控制对比研究}}
-\author{（此处填入姓名与学号）}
+\geometry{left=2.25cm, right=2.25cm, top=2.25cm, bottom=2.30cm}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.35em}
+\renewcommand{\arraystretch}{1.18}
+\setlist{nosep, leftmargin=2.2em}
+\setcounter{tocdepth}{2}
+
+\definecolor{deepblue}{RGB}{24, 66, 117}
+\definecolor{softgray}{RGB}{245, 247, 250}
+\definecolor{darkgreen}{RGB}{25, 112, 74}
+\definecolor{darkred}{RGB}{170, 40, 40}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=deepblue,
+    urlcolor=deepblue,
+    citecolor=deepblue
+}
+\urlstyle{tt}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{轮腿机器人姿态与运动控制对比研究}
+\fancyhead[R]{控制部分大作业二}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\graphicspath{{outputs/compare_four_extended/figures/}}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\good}{\textcolor{darkgreen}{成功}}
+\newcommand{\fail}{\textcolor{darkred}{失败}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+
+\title{\textbf{控制部分大作业二：轮腿机器人姿态与运动控制对比研究}\\[0.5em]
+\large 基于 LQR、WBC/QP 与 PPO 强化学习的建模、实现及鲁棒性分析}
+\author{姓名：\underline{\hspace{4cm}} \qquad 学号：\underline{\hspace{4cm}}}
 \date{\today}
 
 \begin{document}
+
 \maketitle
 
 \begin{abstract}
-本文针对具有高度非线性与强耦合特性的轮腿机器人，探讨了在外部干扰（不平整地面及水平推力）下的运动与姿态控制问题。基于“搬运菜品”这一高稳定性需求的实际应用场景，系统必须在实现 $0\sim5$ m/s 速度跟踪的同时，严格保证躯干竖直以及髋关节绝对高度的稳定，防止发生倾覆或抛洒。本文设计了一套统一的评价指标体系，并详细推导与设计了三种主流控制算法：线性二次型调节器（LQR）、基于二次规划的全身控制（WBC/QP）以及深度强化学习（RL）。最后，本文设计了三种严苛的干扰场景，对各算法的鲁棒性进行了全面的对比与理论分析。
+本文围绕竖直平面内轮腿机器人的姿态与运动控制问题展开研究。题目给定机器人躯干质量为 $50$ kg，大腿和小腿长度均为 $0.5$ m，轮半径为 $0.1$ m，机器人可控制轮毂、膝关节和髋关节三路驱动力矩。控制目标是在 $0\sim5$ m/s 速度范围内跟踪速度指令，同时抵抗不平整地面与作用于躯干质心处的水平扰动力，并尽量保持髋部绝对高度和躯干姿态稳定。
+
+为了在统一条件下比较不同控制思想，本文基于现有代码实现了一套轻量级二维仿真平台，包含地形建模、逆运动学、简化动力学、四阶 Runge--Kutta 数值积分、失稳判据、日志记录、指标统计和曲线绘制。控制算法按照由模型驱动到数据驱动的顺序展开：首先实现局部线性化 LQR；然后实现基于在线优化的 WBC/QP 风格控制器；最后实现 PPO 强化学习控制器，并进一步实现残差力矩控制和直接力矩控制两种方法。
+
+本文实验覆盖六类固定测试场景和四种控制器，共计 $24$ 次仿真。实验结果表明：LQR 结构简单，在轻度扰动下表现稳定，但在持续外力和组合压力下存在明显稳态偏差；WBC/QP 在单一外力场景中高度与姿态误差较小，但在大幅不规则地形与组合压力下会因腿部力矩长期逼近上限而退化；残差 PPO 能够稳定完成全部六个场景，但速度跟踪和姿态精度仍有提升空间；直接力矩 PPO 在现有训练模型和测试输出中取得了最均衡的综合性能，在六类场景中均完成任务，并在组合压力测试中保持较小误差。
 \end{abstract}
+
+\noindent
 
 \tableofcontents
 \newpage
 
-\section{问题重述与评价指标体系}
-\subsection{系统描述与控制目标}
-本系统为一个在竖直平面内运动的轮腿机器人。其物理参数如下：躯干质量 $m = 50$ kg，大腿与小腿长度均为 $L_1 = L_2 = 0.5$ m（均假设无质量），轮足半径 $R = 0.1$ m（无质量）。系统的控制输入为三个关节的驱动力矩：$U = [\tau_{wheel}, \tau_{knee}, \tau_{hip}]^T$。题目并未给出执行器力矩上限，因此在后续仿真实验中将统一设定 $\tau_{max}$ 作为自定义硬件约束，并保证三类控制器在相同约束下进行比较。
+\section{题目重述与研究路线}
 
-系统在运行过程中面临两种主要干扰：
+\subsection{题目要求}
+
+研究对象为竖直平面内运动的轮腿机器人。机器人可控制轮的驱动力矩、膝关节驱动力矩和髋关节驱动力矩，并受到两类外部干扰：
+
 \begin{enumerate}
-    \item \textbf{地形干扰}：地面不再是绝对水平面，存在未知的起伏。
-    \item \textbf{外部推力干扰}：作用在躯干质心处的水平力 $F \le 100$ N。
+    \item 不平整地面导致轮心高度、地面坡度和地形曲率变化；
+    \item 作用于躯干质心处的水平外力，幅值不大于 $100$ N。
 \end{enumerate}
 
-控制目标是在上述干扰下，使机器人能够在 $0\sim5$ m/s 的速度范围内稳定行驶，同时必须保证躯干姿态始终竖直，并尽量保持髋关节的绝对高度不变。
+设计目标是在 $0\sim5$ m/s 速度范围内稳定跟踪速度指令，使躯干尽量保持竖直，同时减小髋部绝对高度变化。考虑到对于端菜或稳定运输类应用，仅仅不摔倒并不够，所以我们讲高度瞬态、姿态角、速度误差、控制平顺性和力矩饱和比例都应纳入评价。
 
-\subsection{统一评价指标设计}
-为公平且定量地对比不同算法，结合“端菜”场景的物理需求，本文设计了以下核心评价指标：
+\subsection{统一参数}
+
+项目代码中的机器人参数集中定义于 \code{src/config/params.py}。题目明确给出的物理量与仿真中补充设定的工程量列于表~\ref{tab:params}。
 
 \begin{table}[H]
     \centering
-    \caption{轮腿机器人控制算法评价指标体系}
-    \begin{tabular}{@{}p{2.9cm}p{4.0cm}p{6.4cm}p{1.4cm}@{}}
+    \caption{机器人与仿真参数}
+    \label{tab:params}
+    \begin{tabular}{llll}
         \toprule
-        \textbf{指标名称} & \textbf{物理意义} & \textbf{计算公式/描述} & \textbf{权重} \\ \midrule
-        绝对高度误差 & 衡量防打翻能力，要求髋关节绝对高度恒定 & $\text{RMSE}_h = \sqrt{\frac{1}{T}\int_0^T (y_{hip} - y_{ref})^2 dt}$ & 极高 \\
-        最大高度偏差 & 衡量是否出现瞬时越界或明显颠簸 & $e_{h,\max} = \max_{t\in[0,T]} |y_{hip}(t)-y_{ref}|$ & 极高 \\
-        躯干姿态平稳度 & 衡量防洒汤能力，要求躯干绝对竖直 & $\text{RMSE}_\theta = \sqrt{\frac{1}{T}\int_0^T \theta_t^2 dt}$ & 极高 \\
-        最大姿态角 & 衡量瞬态抗冲击能力与倾覆风险 & $\theta_{\max} = \max_{t\in[0,T]} |\theta_t(t)|$ & 极高 \\
-        速度跟踪误差 & 衡量运输效率及对速度指令的响应能力 & $\text{RMSE}_v = \sqrt{\frac{1}{T}\int_0^T (\dot{x}_{hip} - v_{cmd})^2 dt}$ & 高 \\
-        控制平顺性 & 衡量系统加速度变化率与乘载平稳性 & $J = \int_0^T \left(\|\dddot{p}_{hip}\|^2 + \lambda_\theta |\ddot{\theta}_t|^2\right) dt$ & 中 \\
-        能耗指标 & 衡量控制代价 & $E = \int_0^T \|\tau(t)\|^2 dt$ & 中 \\
-        力矩饱和比例 & 衡量控制器是否长期依赖硬件极限 & $\rho_{sat} = \frac{1}{3T}\sum_{i=1}^{3}\int_0^T \mathbb{I}(|\tau_i| \ge 0.98\tau_{max})dt$ & 中 \\
-        任务完成率 & 衡量算法在多场景下的可靠性 & 未触发失稳、接触失效、关节越界或求解失败的测试占比 & 极高 \\ \bottomrule
+        参数 & 符号 & 数值 & 说明 \\
+        \midrule
+        躯干质量 & $m$ & $50$ kg & 题目给定 \\
+        大腿长度 & $L_1$ & $0.5$ m & 题目给定 \\
+        小腿长度 & $L_2$ & $0.5$ m & 题目给定 \\
+        轮半径 & $r$ & $0.1$ m & 题目给定 \\
+        重力加速度 & $g$ & $9.81$ m/s$^2$ & 常规设定 \\
+        躯干等效转动惯量 & $I$ & $5.0$ kg$\cdot$m$^2$ & 简化模型设定 \\
+        摩擦系数 & $\mu$ & $0.8$ & 简化接触模型设定 \\
+        期望髋部高度 & $y_{\mathrm{ref}}$ & $0.82$ m & 统一测试设定 \\
+        仿真步长 & $\Delta t$ & $0.01$ s & $100$ Hz 控制周期 \\
+        单次仿真时长 & $T$ & $8.0$ s & 固定场景默认时长 \\
+        力矩上限 & $\tau_{\max}$ & $[30,160,120]^\mathsf{T}$ N$\cdot$m & 轮、膝、髋三路自定义约束 \\
+        残差动作尺度 & $s_{\mathrm{res}}$ & $[5,25,25]^\mathsf{T}$ N$\cdot$m & 残差 PPO 使用 \\
+        \bottomrule
     \end{tabular}
 \end{table}
 
-\subsection{失稳与任务失败判据}
-除连续指标外，本文还设置离散的任务失败判据，用于判断控制器是否已经不满足“端菜”任务的安全底线。若出现以下任一情况，则该次仿真记为失败：
+因为题目没有给出执行器极限，但控制器不能依靠无限大的瞬时力矩取得不现实的结果。因此三路力矩上限是人为定义的假设。
+
+\subsection{整体实现路线}
+
+项目采用同一套地形、动力学、仿真循环和评价指标，对不同控制器进行公平测试。核心调用关系如下：
+
+\begin{center}
+\fbox{
+\parbox{0.91\textwidth}{
+\centering
+固定或随机场景 $\rightarrow$ 地形、速度指令、外力
+$\rightarrow$ 控制器输出三路力矩
+$\rightarrow$ 力矩裁剪与接触约束
+$\rightarrow$ RK4 状态推进
+$\rightarrow$ 失败检测
+$\rightarrow$ \code{.npz} 日志、\code{metrics.csv} 和曲线图
+}}
+\end{center}
+
+主要代码入口如下：
+
+\begin{itemize}
+    \item 固定测试场景：\path{src/config/scenarios.py}；
+    \item 随机训练场景：\path{src/config/random_scenarios.py}；
+    \item 仿真循环：\path{src/simulation/runner.py}；
+    \item 命令行入口：\path{scripts/run_compare.py}、\path{scripts/train_rl.py} 和 \path{scripts/eval_rl.py}。
+\end{itemize}
+
+\section{二维仿真模型}
+
+\subsection{模型边界}
+
+模型保留了与控制任务直接相关的量：髋部水平位置、髋部高度、躯干倾角、三个方向速度、轮地摩擦限制、腿部伸缩能力、地形高度、坡度、曲率和水平外力。它适合用于比较控制策略，但不应等同于实机控制器验证平台。模型没有显式模拟轮转角、腿段质量分布、关节柔性、传感器延迟、轮地碰撞和复杂离地过程。
+
+\subsection{状态、输入与地形}
+
+仿真状态定义为
+\begin{equation}
+    \boldsymbol{x}
+    =
+    [x,\; y,\; \theta,\; v_x,\; v_y,\; \omega]^\mathsf{T},
+\end{equation}
+其中 $x,y$ 为髋部位置，$\theta$ 为躯干倾角，$v_x,v_y$ 为平动速度，$\omega$ 为躯干角速度。控制输入为
+\begin{equation}
+    \boldsymbol{\tau}
+    =
+    [\tau_{\mathrm{wheel}},\; \tau_{\mathrm{knee}},\; \tau_{\mathrm{hip}}]^\mathsf{T}.
+\end{equation}
+
+地形类位于 \code{src/model/terrain.py}，实现了四种地面：
+
+\begin{itemize}
+    \item \code{FlatTerrain}：平坦地面；
+    \item \code{SineTerrain}：单一正弦地面；
+    \item \code{MultiSineTerrain}：多频正弦叠加地面，并限制最大绝对高度；
+    \item \code{NoiseTerrain}：随机采样后经过多次卷积平滑的伪随机地形。
+\end{itemize}
+
+地形向控制器和动力学模块提供高度 $h(x)$、坡度 $h'(x)$ 和曲率 $h''(x)$。其中正弦与多正弦地形使用解析导数，噪声地形使用有限差分近似。
+
+\subsection{运动学近似}
+
+轮心高度由地形和轮半径确定：
+\begin{equation}
+    y_{\mathrm{wheel}} = h(x) + r.
+\end{equation}
+
+当前模型将腿部视为竖直方向上的等效伸缩机构，因此腿长为
+\begin{equation}
+    l = y - y_{\mathrm{wheel}}.
+\end{equation}
+
+在 \code{src/model/kinematics.py} 中，程序进一步根据两段等长连杆进行逆运动学计算。设大腿和小腿长度分别为 $L_1$、$L_2$，则膝关节内部夹角满足
+\begin{equation}
+    \cos \beta_{\mathrm{int}}
+    =
+    \frac{L_1^2 + L_2^2 - l^2}{2L_1L_2}.
+\end{equation}
+代码将其转换为膝关节屈曲角，并取髋关节角为膝关节屈曲角的一半。逆解主要用于判断腿长是否可达，以及构造 RL 观测量。
+
+\subsection{简化动力学}
+
+动力学实现位于 \code{src/model/dynamics.py}。所有控制器输出首先被裁剪到统一力矩上限：
+\begin{equation}
+    \boldsymbol{\tau}
+    \leftarrow
+    \operatorname{clip}(\boldsymbol{\tau},-\boldsymbol{\tau}_{\max},
+    \boldsymbol{\tau}_{\max}).
+\end{equation}
+
+膝关节和髋关节力矩共同产生等效腿部支撑力：
+\begin{equation}
+    F_{\mathrm{leg}}
+    =
+    \frac{\tau_{\mathrm{knee}} + 0.6\tau_{\mathrm{hip}}}{d},
+    \qquad
+    d = 0.25 \text{ m}.
+\end{equation}
+
+轮毂力矩映射为期望切向驱动力：
+\begin{equation}
+    F_{\mathrm{drive,cmd}}
+    =
+    \frac{\tau_{\mathrm{wheel}}}{r}.
+\end{equation}
+
+模型中的法向力和切向力为
+\begin{align}
+    F_n &= \max(F_{\mathrm{leg}},0), \\
+    F_t &= \operatorname{clip}
+    \left(
+    F_{\mathrm{drive,cmd}},
+    -\mu \max(F_n,1),
+    \mu \max(F_n,1)
+    \right).
+\end{align}
+
+三个方向的等效加速度分别写为
+\begin{align}
+    \ddot{x}
+    &=
+    \frac{
+    F_t + F_{\mathrm{ext}}
+    - c_x v_x
+    - mg h'(x)
+    }{m}, \\
+    \ddot{y}
+    &=
+    \frac{
+    F_{\mathrm{leg}} - mg - c_y v_y
+    }{m}
+    - 0.25 h''(x)v_x^2, \\
+    \ddot{\theta}
+    &=
+    \frac{
+    \tau_{\mathrm{hip}}
+    + 0.15\tau_{\mathrm{knee}}
+    + 0.25F_{\mathrm{ext}}\max(y-y_{\mathrm{wheel}},0.1)
+    - k_\theta\theta
+    - c_\theta\omega
+    }{I}.
+\end{align}
+
+这里，地形坡度通过 $mg h'(x)$ 影响水平运动，地形曲率通过 $h''(x)v_x^2$ 影响竖直运动；水平外力既影响平动，也通过力臂形成躯干扰动力矩。程序使用四阶 Runge--Kutta 方法积分状态，因此每一个控制周期都要进行四次状态导数计算。
+
+\subsection{失败判据}
+
+仿真在每个时间步更新状态后立即检查安全条件。当前代码使用以下判据：
+
 \begin{enumerate}
-    \item 躯干倾角超过安全阈值：$|\theta_t| > \theta_{fail}$。仿真中可取 $\theta_{fail}=30^\circ$，并在敏感性分析中检查阈值变化的影响。
-    \item 髋关节高度偏差超过容许范围：$|y_{hip}-y_{ref}| > h_{fail}$。仿真中可取 $h_{fail}=0.15$ m，体现菜品明显倾洒或腿部压缩过大的情况。
-    \item 腿部构型不可行：两连杆逆运动学无解、关节角超过设定范围，或所需腿长超过 $L_1+L_2$。
-    \item 轮地接触失效：法向接触力 $F_n < 0$、长时间离地，或切向力违反摩擦锥约束导致打滑。
-    \item 控制器求解失败：QP 不可行、RL 输出长期饱和，或任一执行器持续达到 $\tau_{max}$ 而无法恢复姿态。
+    \item 躯干倾角超过 $30^\circ$，记为 \code{theta_fail}；
+    \item 髋部高度偏离 $y_{\mathrm{ref}}$ 超过 $0.15$ m，记为 \code{height_fail}；
+    \item 腿长超出逆运动学可达范围，记为 \code{leg_infeasible}；
+    \item 腿长小于 $0.18$ m，记为 \code{leg_collapsed}。
 \end{enumerate}
 
-\section{方法一：基于 LQR 的局部最优控制设计}
-线性二次型调节器（LQR）是一种经典的基于模型的工作点局部最优控制方法。通过对复杂的非线性动力学模型进行泰勒展开，可以在特定的平衡态附近实现最优调节。
+固定场景默认在首次失败后终止仿真。命令行参数 \code{--continue-after-failure} 可以让程序继续记录失稳后的曲线。
 
-\subsection{非线性动力学建模}
-选取系统的广义坐标为 $q = [x_w, \theta_1, \theta_2, \theta_t]^T$，分别表示轮心水平位置、大腿相对于竖直方向的夹角、小腿相对于大腿的夹角、以及躯干的倾斜角。
+\section{评价指标与数据记录}
 
-根据拉格朗日法，系统的动力学方程可写为标准形式：
-$$ M(q)\ddot{q} + C(q, \dot{q})\dot{q} + G(q) = S U + J_{ext}^T F_{ext} $$
-其中：
+\subsection{日志内容}
+
+每次仿真都保存一个 \code{.npz} 文件。日志字段包括：
+
 \begin{itemize}
-    \item $M(q) \in \mathbb{R}^{4 \times 4}$ 为正定对称的惯性质量矩阵。
-    \item $C(q, \dot{q}) \in \mathbb{R}^{4 \times 4}$ 为科氏力与离心力矩阵。
-    \item $G(q) \in \mathbb{R}^{4 \times 1}$ 为重力向量。
-    \item $S \in \mathbb{R}^{4 \times 3}$ 为控制输入映射矩阵，$U = [\tau_{wheel}, \tau_{knee}, \tau_{hip}]^T$。
-    \item $J_{ext}$ 为外部力 $F_{ext}$ 作用点的雅可比矩阵。
+    \item 时间、髋部位置、髋部速度、躯干角度与角速度；
+    \item 速度指令、髋部参考高度、外部水平力；
+    \item 地形高度、地形坡度、轮心高度、腿长；
+    \item 三路执行器力矩；
+    \item 法向接触力、切向接触力；
+    \item 水平加速度、竖直加速度、角加速度；
+    \item 力矩饱和状态、失败状态和失败原因。
 \end{itemize}
 
-\textbf{物理模型修正：} 题目假定大腿、小腿及车轮均无质量。若直接建立全状态动力学模型，系统质量会高度集中于躯干或髋关节附近，惯性矩阵可能出现秩亏或严重病态。为保证正向动力学可计算，可在仿真模型中引入极小的车轮等效质量与关节转子惯量作为数值正则化项。该处理不改变“腿部极轻”的主要物理含义，但能避免 $M(q)^{-1}$ 求解时发生数值爆炸。
+对于完整的 $8$ s 仿真，日志包含 $801$ 个采样点。曲线图由 \code{src/evaluation/plots.py} 生成，每张图固定包含四个子图：髋部高度、躯干角度、水平速度和三路力矩。
 
-\subsection{工作点线性化}
-定义状态向量 $X = [q^T, \dot{q}^T]^T \in \mathbb{R}^{8 \times 1}$。系统状态方程为 $\dot{X} = f(X, U, F_{ext})$。
-选取目标工作点 $X^*$ 为：机器人在平整地面以速度 $v_{cmd}$ 匀速行驶，躯干直立（$\theta_t = 0, \dot{\theta}_t = 0$），腿部关节保持恒定构型以维持期望高度 $y_{ref}$，且无外部干扰（$F_{ext} = 0$）。
+\subsection{核心评价指标}
 
-在工作点 $(X^*, U^*)$ 处进行一阶泰勒展开，得到误差状态方程：
-$$ \Delta \dot{X} = A \Delta X + B \Delta U $$
-其中，$A = \frac{\partial f}{\partial X}\Big|_{X^*, U^*}$，$B = \frac{\partial f}{\partial U}\Big|_{X^*, U^*}$。
+评价模块位于 \code{src/evaluation/metrics.py}。本文主要使用表~\ref{tab:metrics} 中的指标。
 
-由于系统在水平方向具有平移不变性，绝对位置 $x_w$ 本身通常不会影响重力项和内部约束，因此线性化后的 $A$ 矩阵可能存在原点附近的临界模态。实际求解 LQR 时，可采用速度跟踪误差而非绝对位置误差作为主要状态，或引入极小的阻尼/正则化项，使代数黎卡提方程具有良好的数值条件。
+\begin{table}[H]
+    \centering
+    \caption{统一评价指标}
+    \label{tab:metrics}
+    \begin{tabularx}{\textwidth}{p{3.2cm}Y}
+        \toprule
+        指标 & 定义与解释 \\
+        \midrule
+        成功率 &
+        未触发失败判据则记为成功。该指标首先反映控制器能否完成任务。 \\
+        高度 RMSE &
+        $\mathrm{RMSE}_h=\sqrt{\frac{1}{N}\sum_k(y_k-y_{\mathrm{ref}})^2}$。
+        反映运输平台上下颠簸程度。 \\
+        最大高度偏差 &
+        $e_{h,\max}=\max_k|y_k-y_{\mathrm{ref}}|$。
+        用于识别瞬时冲击和接近失败阈值的情况。 \\
+        姿态 RMSE &
+        $\mathrm{RMSE}_\theta=\sqrt{\frac{1}{N}\sum_k\theta_k^2}$，
+        报告中统一换算为角度。 \\
+        最大姿态角 &
+        $\theta_{\max}=\max_k|\theta_k|$。
+        反映瞬态倾覆风险。 \\
+        速度 RMSE &
+        $\mathrm{RMSE}_v=\sqrt{\frac{1}{N}\sum_k(v_{x,k}-v_{\mathrm{cmd},k})^2}$。 \\
+        力矩饱和比例 &
+        三路力矩中满足 $|\tau_i|\ge 0.98\tau_{i,\max}$ 的采样比例。 \\
+        平顺性指标 &
+        $J_{\mathrm{jerk}}=\int(\dot{a}_x^2+0.1\ddot{\theta}^2)\,\mathrm{d}t$。
+        数值越小，水平加速度变化越平缓。 \\
+        能耗代理量 &
+        $E_\tau=\int\|\boldsymbol{\tau}\|_2^2\,\mathrm{d}t$。
+        它是力矩平方积分，而不是严格的电能模型。 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
-\subsection{控制器设计}
-设计二次型代价函数：
-$$ J_{LQR} = \int_{0}^{\infty} (\Delta X^T Q \Delta X + \Delta U^T R \Delta U) dt $$
-在 $Q$ 矩阵的设计中，为了满足大作业要求，我们对躯干角度偏差 $\Delta \theta_t$ 和影响高度的关节角度偏差赋予极大的惩罚权重（如 $10^4$ 量级）。求解代数黎卡提方程（ARE）得到最优反馈增益 $K$。
-控制律为：$U = \text{Clip}(U^* - K(X - X^*), -\tau_{max}, \tau_{max})$。
+\code{metrics.csv} 默认保存成功率、高度误差、姿态误差、速度误差和饱和比例等核心列。
+\section{方法一：局部线性化 LQR 控制}
 
-\textbf{局限性预判}：LQR 极度依赖线性化工作点。当面临地面起伏导致腿部构型大幅改变，或者受到超过 100N 的大推力导致躯干产生较大倾角时，系统状态偏离平衡点较远，LQR 的线性化假设失效，极易导致控制发散。
+\subsection{方法思路}
 
-\section{方法二：基于二次规划的全身控制设计 (QP/WBC)}
-为了克服 LQR 无法处理硬约束和复杂非线性地形的问题，本文引入基于二次规划（QP）的全身控制（Whole-Body Control）。该方法在每个控制周期内求解一个带约束的优化问题，非常适合“端菜”这种具有严格物理约束的任务。
+LQR 的基本思想是：在给定速度附近寻找平衡状态，对非线性动力学进行局部线性化，然后使用二次型性能指标求解最优状态反馈增益。它结构清晰、计算量小，适合作为模型控制基线。
 
-\subsection{任务空间定义与优先级划分}
-将控制目标转化为任务空间（Task Space）中的轨迹跟踪，并按照重要性严格划分优先级：
+对于目标速度 $v_{\mathrm{cmd}}$，代码首先构造平衡状态
+\begin{equation}
+    \boldsymbol{x}_0
+    =
+    [0,\;y_{\mathrm{ref}},\;0,\;v_{\mathrm{cmd}},\;0,\;0]^\mathsf{T}.
+\end{equation}
+
+对应的近似平衡力矩为
+\begin{align}
+    \tau_{\mathrm{wheel},0}
+    &= c_x v_{\mathrm{cmd}}r, \\
+    \tau_{\mathrm{knee},0}
+    &= \frac{mgd}{0.91}, \\
+    \tau_{\mathrm{hip},0}
+    &= -0.15\tau_{\mathrm{knee},0}.
+\end{align}
+
+\subsection{数值线性化与反馈增益}
+
+\code{src/controllers/lqr.py} 使用中心差分对状态方程进行数值线性化：
+\begin{equation}
+    \Delta\dot{\boldsymbol{x}}
+    =
+    A\Delta\boldsymbol{x}
+    +
+    B\Delta\boldsymbol{\tau}.
+\end{equation}
+
+差分步长为 $10^{-5}$。线性化过程在平地、无外力条件下进行。状态权重和输入权重分别为
+\begin{align}
+    Q
+    &=
+    \operatorname{diag}
+    (0,\;600,\;1800,\;30,\;120,\;280), \\
+    R
+    &=
+    \operatorname{diag}
+    (0.03,\;0.06,\;0.05).
+\end{align}
+
+程序通过连续时间代数 Riccati 方程求解反馈矩阵 $K$，控制律为
+\begin{equation}
+    \boldsymbol{\tau}
+    =
+    \operatorname{clip}
+    \left[
+    \boldsymbol{\tau}_0
+    -
+    K(\boldsymbol{x}-\boldsymbol{x}_{\mathrm{ref}})
+    \right].
+\end{equation}
+
+参考状态中的水平位置直接取当前 $x$，因此 LQR 只调节速度而不约束绝对行驶距离。不同目标速度的增益按照保留两位小数后的速度键缓存，避免每个时间步重复求解 Riccati 方程。
+
+\subsection{实现特点与预期局限}
+
+LQR 的优点是控制过程平滑、计算量小，并且容易解释。但它的线性化模型不显式感知当前地形，也没有外力观测器或积分环节。因此：
+
 \begin{itemize}
-    \item \textbf{任务 1（最高优先级，安全任务）}：保持髋关节绝对高度 $y_{hip} = y_{ref}$，保持躯干完全竖直 $\theta_t = 0$。这是“不打翻”的核心底线。
-    \item \textbf{任务 2（次优先级，运动任务）}：质心水平速度跟踪期望指令 $\dot{x}_{hip} = v_{cmd}$。
+    \item 对持续外力容易产生高度与姿态稳态偏差；
+    \item 对较大地形曲率只能依靠状态反馈被动修正；
+    \item 当状态显著偏离平衡点时，局部线性化假设逐渐失效。
 \end{itemize}
 
-针对每个任务，设计基于 PD 规律的期望任务空间加速度：
-$$ \ddot{X}_{des, i} = \ddot{X}_{ref, i} + K_{P,i}(X_{ref, i} - X_i) + K_{D,i}(\dot{X}_{ref, i} - \dot{X}_i) $$
+\section{方法二：WBC/QP 控制}
 
-\subsection{QP 优化问题构建}
-以关节角加速度 $\ddot{q}$、接触力 $F_c$ 和关节力矩 $\tau$ 为优化变量，构建如下二次规划问题：
+\subsection{实现形式}
 
-\textbf{目标函数}（最小化任务跟踪误差及力矩消耗）：
-$$ \min_{\ddot{q}, F_c, \tau} \sum_{i=1}^{2} \omega_i \left\| J_i \ddot{q} + \dot{J}_i \dot{q} - \ddot{X}_{des, i} \right\|^2 + \omega_u \|\tau\|^2 $$
-其中 $\omega_1 \gg \omega_2$ 以体现优先级，$\omega_u$ 为能量权重。
+理论上的全身控制通常以关节加速度、接触力和关节力矩为优化变量，同时加入完整刚体动力学、摩擦锥、单边接触和关节限位等约束。但我们采用了更简洁的实现：直接以三路力矩作为优化变量，在每个控制周期内调用 SLSQP 求解一个带力矩边界的非线性优化问题。
 
-\textbf{约束条件}：
+
+\subsection{任务空间目标}
+
+\code{src/controllers/wbc_qp.py} 根据当前状态和地形曲率构造期望加速度：
+\begin{align}
+    a_{x,\mathrm{des}}
+    &=
+    4.0(v_{\mathrm{cmd}}-v_x), \\
+    a_{y,\mathrm{des}}
+    &=
+    85.0(y_{\mathrm{ref}}-y)
+    -18.0v_y
+    +0.35h''(x)v_x^2, \\
+    \alpha_{\mathrm{des}}
+    &=
+    -95.0\theta-18.0\omega.
+\end{align}
+
+可以看到，控制器显式加入了地形曲率前馈项。这是它在规则地形中保持高度和姿态稳定的重要原因。
+
+\subsection{在线优化目标}
+
+优化变量为
+\begin{equation}
+    \boldsymbol{\tau}
+    =
+    [\tau_{\mathrm{wheel}},\tau_{\mathrm{knee}},\tau_{\mathrm{hip}}]^\mathsf{T}.
+\end{equation}
+
+目标函数可以写为
+\begin{equation}
+    \min_{\boldsymbol{\tau}}
+    \left\|
+    W\left[
+    \boldsymbol{a}(\boldsymbol{x},\boldsymbol{\tau})
+    -
+    \boldsymbol{a}_{\mathrm{des}}
+    \right]
+    \right\|_2^2
+    +
+    0.015
+    \left\|
+    \frac{\boldsymbol{\tau}}{\boldsymbol{\tau}_{\max}}
+    \right\|_2^2
+    +
+    0.01
+    \left\|
+    \frac{\boldsymbol{\tau}-\boldsymbol{\tau}_{\mathrm{last}}}
+    {\boldsymbol{\tau}_{\max}}
+    \right\|_2^2,
+\end{equation}
+其中
+\begin{equation}
+    W=\operatorname{diag}(1,\;8,\;12).
+\end{equation}
+
+三个加速度方向并非同等重要。竖直加速度权重为 $8$，姿态角加速度权重为 $12$，都明显高于水平速度方向。这符合稳定运输任务的优先级。
+
+力矩边界为
+\begin{equation}
+    -\boldsymbol{\tau}_{\max}
+    \le
+    \boldsymbol{\tau}
+    \le
+    \boldsymbol{\tau}_{\max}.
+\end{equation}
+
+程序将上一时刻力矩作为下一次求解初值，以改善时间连续性和收敛速度。若优化求解失败，则回退到上一时刻力矩。
+
+\subsection{摩擦处理与局限}
+
+动力学模块已经将轮地切向力裁剪到摩擦限制内，因此实际前向仿真不会使用超出摩擦边界的切向力。优化目标中仍保留了摩擦裕量惩罚项，但由于输入优化函数读到的是已经裁剪后的切向力，该惩罚项在当前实现中通常不会成为主导项。更严格的做法是将未裁剪的切向驱动力和显式摩擦不等式直接写入优化约束。
+
+此外，当前优化器不显式预测未来状态。面对高曲率地形、持续外力和力矩上限共同作用时，即使每一步局部优化都合理，也可能逐步进入无法恢复的低高度状态。扩展压力测试 E 中出现的失败正是这一局限的体现。
+
+\section{方法三：PPO 强化学习控制}
+
+\subsection{Gymnasium 环境}
+
+强化学习环境实现于 \code{src/rl/env.py}，符合 Gymnasium 接口。动作空间为
+\begin{equation}
+    \boldsymbol{a}\in[-1,1]^3.
+\end{equation}
+
+观测向量为
+\begin{equation}
+    \boldsymbol{o}
+    =
+    [
+    y-y_{\mathrm{ref}},
+    \theta,
+    v_x-v_{\mathrm{cmd}},
+    v_y,
+    \omega,
+    l,
+    h(x),
+    h'(x),
+    v_{\mathrm{cmd}}
+    ]^\mathsf{T}.
+\end{equation}
+
+观测中包含高度误差、姿态、速度误差、腿长、地形高度、坡度和目标速度。与 LQR 相比，策略网络可以直接利用地形信息形成非线性映射。
+
+每次环境重置时，程序会在期望初始状态附近加入小幅随机扰动，包括髋部高度、躯干角度、水平速度、竖直速度和角速度。这样可以避免策略只在完全静止的理想初值附近工作。
+
+\subsection{奖励函数}
+
+每一步奖励为
+\begin{align}
+    r ={}&
+    0.5
+    +3.5\exp[-130(y-y_{\mathrm{ref}})^2]
+    +2.5\exp(-45\theta^2) \nonumber\\
+    &+1.2\exp[-0.7(v_x-v_{\mathrm{cmd}})^2]
+    -35(y-y_{\mathrm{ref}})^2
+    -3\theta^2 \nonumber\\
+    &-c_a\|\boldsymbol{a}\|_2^2
+    -0.001\|\boldsymbol{a}_{\mathrm{dyn}}\|_2^2
+    +r_{\mathrm{sat}}
+    +r_{\mathrm{fail}},
+\end{align}
+其中 $\boldsymbol{a}_{\mathrm{dyn}}=[\ddot{x},\ddot{y},\ddot{\theta}]^\mathsf{T}$。动作代价系数在残差模式下为 $0.03$，在直接模式下为 $0.008$。当任一归一化动作接近边界时额外惩罚 $0.5$；触发失败条件时额外惩罚 $50$。
+
+直接模式还加入了较小的力矩比例惩罚：
+\begin{equation}
+    -0.004
+    \left\|
+    \frac{\boldsymbol{\tau}}{\boldsymbol{\tau}_{\max}}
+    \right\|_2^2.
+\end{equation}
+
+\subsection{残差力矩 PPO}
+
+残差 PPO 不直接负责全部力矩，而是围绕一个基础稳定器学习修正量。基础稳定器位于 \code{src/controllers/base.py}。其水平、竖直和姿态控制分别为
+\begin{align}
+    a_{x,\mathrm{cmd}}
+    &=
+    3(v_{\mathrm{cmd}}-v_x)
+    -
+    \frac{F_{\mathrm{ext}}}{m}, \\
+    a_{y,\mathrm{cmd}}
+    &=
+    70(y_{\mathrm{ref}}-y)-16v_y, \\
+    \alpha_{\mathrm{cmd}}
+    &=
+    -85\theta-18\omega.
+\end{align}
+
+对应的基础力矩经过重力补偿和外力补偿后，与策略修正量相加：
+\begin{equation}
+    \boldsymbol{\tau}
+    =
+    \operatorname{clip}
+    \left(
+    \boldsymbol{\tau}_{\mathrm{base}}
+    +
+    \boldsymbol{a}\odot
+    [5,25,25]^\mathsf{T}
+    \right).
+\end{equation}
+
+残差控制的训练难度较低，因为策略不必从零学会支撑躯干，只需要修正基础控制器的不足。
+\subsection{直接力矩 PPO}
+
+直接 PPO 输出完整执行器力矩：
+\begin{align}
+    \tau_{\mathrm{wheel}}
+    &= 30a_1, \\
+    \tau_{\mathrm{knee}}
+    &= \frac{a_2+1}{2}\cdot160, \\
+    \tau_{\mathrm{hip}}
+    &= 120a_3.
+\end{align}
+
+膝关节是主要腿部支撑执行器，因此代码将其映射到 $[0,160]$ N$\cdot$m，而不是对称的负正范围。直接模式更难训练，但它的控制上限更高：如果训练充分，策略不再受基础 PD 控制器结构限制。
+
+直接 PPO 模型采用分阶段训练思路：先在平地简单任务中学会支撑和移动，再逐渐加入外力和随机地形。
+\subsection{随机训练场景}
+
+训练脚本 \code{scripts/train_rl.py} 支持三档随机场景：
+
+\begin{itemize}
+    \item \code{random_easy}：$0\sim2$ m/s，平地，无外力；
+    \item \code{random_force}：$0\sim3$ m/s，平地，随机平滑脉冲或渐变外力；
+    \item \code{random_full}：$0\sim5$ m/s，随机平地、正弦、多正弦或噪声地形，并随机加入平滑外力。
+\end{itemize}
+
+默认 PPO 超参数为：\code{MlpPolicy}、\code{n_steps=1024}、\code{batch_size=256}、$\gamma=0.99$、$\lambda_{\mathrm{GAE}}=0.95$、裁剪系数 $0.2$。残差模式学习率为 $2\times10^{-4}$，熵系数为 $0.003$；直接模式学习率为 $3\times10^{-4}$，熵系数为 $0.008$。
+
+\section{固定场景与实验设置}
+
+\subsection{测试场景}
+
+当前代码的 \code{default_scenarios()} 已经包含六个固定场景。表~\ref{tab:scenarios} 汇总了实验条件。
+
+\begin{table}[H]
+    \centering
+    \caption{固定测试场景}
+    \label{tab:scenarios}
+    \begin{tabularx}{\textwidth}{p{3.7cm}p{1.5cm}p{3.7cm}Y}
+        \toprule
+        场景 & 指令速度 & 外力 & 地形 \\
+        \midrule
+        A：瞬态强冲击
+        & $2$ m/s
+        & $t=5$ s 时施加 $100$ N、持续 $0.1$ s
+        & 平地 \\
+        B：持续恒定推力
+        & $3$ m/s
+        & 持续 $80$ N
+        & 平地 \\
+        C1：规则正弦地形
+        & $2$ m/s
+        & 无
+        & 振幅 $0.05$ m、波长 $1.0$ m 的正弦地形 \\
+        C2：平滑随机地形
+        & $2$ m/s
+        & 无
+        & 振幅参数 $0.04$ m、固定随机种子 $7$ 的平滑噪声地形 \\
+        D：大幅不规则地形
+        & $2$ m/s
+        & 无
+        & 三频正弦叠加，最大绝对高度约 $0.085$ m \\
+        E：组合越界压力
+        & $3$ m/s
+        & 持续 $60$ N，并在 $t=4$ s 叠加 $100$ N 脉冲
+        & 三频正弦叠加，最大绝对高度约 $0.090$ m \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+六个场景在代码中的标识如下：
+
+\begin{itemize}
+    \item \path{A_impulse_push}、\path{B_constant_push}；
+    \item \path{C_rough_terrain}、\path{C_noise_terrain}；
+    \item \path{D_large_irregular_terrain}、\path{E_combined_stress}。
+\end{itemize}
+
+
+\subsection{对比数据来源}
+
+本文主要分析 \code{outputs/compare_four_extended}：
+
+\begin{itemize}
+    \item \code{metrics.csv}：包含 $24$ 行核心指标；
+    \item \code{logs/}：包含 $24$ 个完整或失败截断后的 \code{.npz} 日志；
+    \item \code{figures/}：包含 $24$ 张四联曲线图。
+\end{itemize}
+
+四种参与对比的控制器为 \code{lqr}、\code{wbc_qp}、\code{rl_ppo} 和 \code{rl_ppo_direct}。成功的完整仿真持续 $8$ s；WBC/QP 在场景 E 中于约 $1.49$ s 触发高度失败，因此其日志提前结束。
+
+\section{总体结果}
+
+\subsection{六场景汇总}
+
+表~\ref{tab:aggregate} 给出六个扩展场景的平均指标。平均值直接由 \code{metrics.csv} 汇总。需要注意：WBC/QP 在场景 E 中提前失败，其平均误差只覆盖失败前日志，因此不能简单将其均值理解为完整时域性能。
+
+\begin{table}[H]
+    \centering
+    \caption{扩展对比实验的六场景汇总}
+    \label{tab:aggregate}
+    \small
+    \begin{tabularx}{\textwidth}{lcccccY}
+        \toprule
+        控制器 &
+        成功场景 &
+        平均 $\mathrm{RMSE}_h$ &
+        平均 $\mathrm{RMSE}_\theta$ &
+        平均 $\mathrm{RMSE}_v$ &
+        平均饱和比例 &
+        结论 \\
+        \midrule
+        LQR
+        & $6/6$ & $0.0326$ m & $1.296^\circ$ & $0.194$ m/s & $0.008$
+        & 基线稳定，但持续扰动偏差较大 \\
+        WBC/QP
+        & $5/6$ & $0.0148$ m & $0.083^\circ$ & $0.250$ m/s & $0.070$
+        & 单一扰动精度高，组合压力失效 \\
+        残差 PPO
+        & $6/6$ & $0.0136$ m & $0.643^\circ$ & $0.290$ m/s & $0.045$
+        & 鲁棒但速度误差偏大 \\
+        直接 PPO
+        & $6/6$ & $\mathbf{0.0048}$ m & $0.243^\circ$ & $\mathbf{0.032}$ m/s & $0.024$
+        & 当前输出中综合表现最佳 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+从总体结果可以得到三个结论。
+
 \begin{enumerate}
-    \item \textbf{系统动力学等式约束}：$M(q)\ddot{q} + C(q, \dot{q})\dot{q} + G(q) = S\tau + J_c^T F_c + J_{ext}^T F_{ext}$。
-    \item \textbf{地形接触约束}：轮心高度必须满足 $y_w = h_g(x_w) + R$，其中 $h_g(x)$ 为地面高度函数；在加速度层面对应 $J_c(q)\ddot{q}+\dot{J}_c(q,\dot{q})\dot{q}=\ddot{x}_{terrain}$。
-    \item \textbf{非穿透与单边接触约束}：法向接触力满足 $F_n \ge 0$，防止优化器产生不物理的“拉地面”接触力。
-    \item \textbf{摩擦锥约束（防打滑）}：$|F_t| \le \mu F_n$，其中 $\mu$ 为车轮与地面摩擦系数，$F_t$ 与 $F_n$ 分别为切向和法向接触力。
-    \item \textbf{滚动约束}：若显式引入车轮转角 $\phi_w$，则需满足无滑滚动关系 $\dot{x}_w = R\dot{\phi}_w$；若不引入 $\phi_w$，则将轮端切向驱动力作为等效输入，并在摩擦锥内限制其大小。
-    \item \textbf{关节范围与腿长约束}：膝关节、髋关节角度不得超过机械限位，且期望髋部高度必须处于两连杆可达空间内。
-    \item \textbf{力矩极限约束（自定义硬件限制）}：$-\tau_{max} \le \tau_i \le \tau_{max}$。$\tau_{max}$ 不来自题目给定，而是在仿真中统一设定，用于公平比较三种控制器。
+    \item LQR 并没有在复杂场景中立即失稳，但在持续外力和组合压力下需要通过较大的高度偏差与姿态偏差维持平衡。这说明“成功完成仿真”和“满足高稳定运输要求”不是一回事。
+    \item WBC/QP 在 A、B、C1、C2 场景中表现出很强的姿态控制能力，尤其在持续推力场景中几乎完全消除了稳态偏差；但它对高曲率地形和执行器余量较敏感。
+    \item 直接 PPO 在现有输出中取得最均衡结果。其优势并不体现在某一个单项理论指标上，而是体现在高度、速度、姿态和场景成功率之间的综合平衡。
 \end{enumerate}
 
-\textbf{算法优势}：当遇到不平整地面时，QP 优化器能够自动利用运动学雅可比矩阵 $J$ 求解出双腿的伸缩策略（即调整 $\alpha_1, \alpha_2$），以吸收地形高低差，完美隔离地形扰动对躯干高度和姿态的影响。
+\subsection{平顺性与能耗的补充观察}
 
-\section{方法三：基于深度强化学习的控制设计 (RL)}
-传统的模型控制高度依赖于精确的参数和环境感知。本文进一步引入无模型的深度强化学习（Reinforcement Learning, RL），采用 PPO（Proximal Policy Optimization）算法，通过大规模仿真试错获取高鲁棒性的神经网络控制策略。
+从 \code{.npz} 日志重新计算可知，规则正弦地形 C1 中，WBC/QP 的平顺性指标约为 $20.86$，直接 PPO 为 $140.63$，而 LQR 和残差 PPO 分别达到 $4186.28$ 和 $4250.30$。这说明 WBC/QP 的曲率前馈在规则地形中十分有效。
 
-\subsection{MDP 模型构建}
+在更困难的组合压力场景 E 中，LQR 和残差 PPO 的平顺性指标分别升至约 $39934.2$ 和 $32818.3$，直接 PPO 为 $4504.68$。WBC/QP 的指标约为 $1523.99$，但这一数字只覆盖失败前的 $1.49$ s，不能与完整 $8$ s 记录直接比较。
+
+四类控制器的力矩平方积分整体处于相同量级。由于膝关节需要持续提供重力支撑，能耗代理量长期由膝关节力矩主导。若后续希望进行能耗优化，应建立更严格的电机功率模型，而不仅使用 $\int\|\tau\|^2\mathrm{d}t$。
+
+\section{分场景鲁棒性分析}
+
+\subsection{场景 A：瞬态强冲击}
+
+场景 A 在平地 $2$ m/s 行驶过程中，于 $t=5$ s 对躯干施加 $100$ N、持续 $0.1$ s 的水平脉冲。表~\ref{tab:scene-a} 给出结果。
+
+\begin{table}[H]
+    \centering
+    \caption{场景 A：瞬态强冲击结果}
+    \label{tab:scene-a}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        控制器 & 结果 & $\mathrm{RMSE}_h$ & $e_{h,\max}$ &
+        $\mathrm{RMSE}_\theta$ & $\theta_{\max}$ &
+        $\mathrm{RMSE}_v$ & 饱和比例 \\
+        \midrule
+        LQR & \good & $0.00346$ & $0.01211$ & $0.2156^\circ$ & $1.0015^\circ$ & $0.1152$ & $0$ \\
+        WBC/QP & \good & $1.01\times10^{-6}$ & $2.12\times10^{-6}$ & $9.19\times10^{-6}{}^\circ$ & $2.37\times10^{-5}{}^\circ$ & $0.1680$ & $0$ \\
+        残差 PPO & \good & $0.00789$ & $0.00874$ & $0.7208^\circ$ & $1.4802^\circ$ & $0.2084$ & $0$ \\
+        直接 PPO & \good & $0.00246$ & $0.00397$ & $0.1762^\circ$ & $0.4979^\circ$ & $0.0344$ & $0$ \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
+
+四类控制器均完成任务。WBC/QP 在高度和姿态方面几乎不受脉冲影响，说明在当前简化动力学中，已知外力进入在线优化后能够被及时抵消。直接 PPO 的综合性能更均衡，速度 RMSE 仅为 $0.0344$ m/s。LQR 的峰值姿态角达到约 $1.00^\circ$，但仍能够恢复。残差 PPO 也保持稳定，不过姿态误差比直接 PPO 更大。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{A_impulse_push__lqr.png}
+        \caption{LQR}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{A_impulse_push__rl_ppo_direct.png}
+        \caption{直接 PPO}
+    \end{subfigure}
+    \caption{场景 A 的代表性曲线。脉冲发生在 $t=5$ s。}
+    \label{fig:scene-a}
+\end{figure}
+
+\subsection{场景 B：持续恒定推力}
+
+场景 B 在平地以 $3$ m/s 行驶，并从仿真开始持续施加 $80$ N 水平外力。这一场景能够直接检验控制器是否具备外力补偿能力。
+
+\begin{table}[H]
+    \centering
+    \caption{场景 B：持续恒定推力结果}
+    \label{tab:scene-b}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        控制器 & 结果 & $\mathrm{RMSE}_h$ & $e_{h,\max}$ &
+        $\mathrm{RMSE}_\theta$ & $\theta_{\max}$ &
+        $\mathrm{RMSE}_v$ & 饱和比例 \\
+        \midrule
+        LQR & \good & $0.07679$ & $0.08165$ & $4.1251^\circ$ & $4.2856^\circ$ & $0.2503$ & $0$ \\
+        WBC/QP & \good & $6.51\times10^{-7}$ & $1.93\times10^{-6}$ & $6.57\times10^{-6}{}^\circ$ & $2.05\times10^{-5}{}^\circ$ & $0.2519$ & $0$ \\
+        残差 PPO & \good & $0.00890$ & $0.01000$ & $0.4181^\circ$ & $1.3208^\circ$ & $0.3119$ & $0$ \\
+        直接 PPO & \good & $0.00218$ & $0.00234$ & $0.2527^\circ$ & $0.6825^\circ$ & $0.0231$ & $0$ \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
+
+图~\ref{fig:scene-b} 清楚地展示了 LQR 的稳态偏差。受持续外力影响，LQR 的髋部高度由 $0.82$ m 逐渐下降到约 $0.74$ m，躯干角稳定在约 $4.3^\circ$，水平速度则略高于目标值。由于 LQR 线性化时假设外力为零，并且没有额外积分环节或外力观测器，因此只能在新的偏置状态附近达到平衡。
+
+WBC/QP 的曲线与之形成鲜明对比：高度几乎保持在 $0.82$ m，姿态误差接近数值精度量级。原因是在线优化计算加速度时显式使用了外力。直接 PPO 同样取得较小误差，并将速度 RMSE 压缩到 $0.0231$ m/s。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{B_constant_push__lqr.png}
+        \caption{LQR：存在明显稳态偏差}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{B_constant_push__wbc_qp.png}
+        \caption{WBC/QP：高度与姿态接近参考值}
+    \end{subfigure}
+    \caption{场景 B 的代表性曲线。}
+    \label{fig:scene-b}
+\end{figure}
+
+\subsection{场景 C1：规则正弦地形}
+
+场景 C1 使用振幅 $0.05$ m、波长 $1.0$ m 的连续正弦地面。该场景主要检验控制器是否能够抑制地形周期性起伏。
+
+\begin{table}[H]
+    \centering
+    \caption{场景 C1：规则正弦地形结果}
+    \label{tab:scene-c1}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        控制器 & 结果 & $\mathrm{RMSE}_h$ & $e_{h,\max}$ &
+        $\mathrm{RMSE}_\theta$ & $\theta_{\max}$ &
+        $\mathrm{RMSE}_v$ & 饱和比例 \\
+        \midrule
+        LQR & \good & $0.01432$ & $0.02501$ & $0.0770^\circ$ & $0.1355^\circ$ & $0.2873$ & $0$ \\
+        WBC/QP & \good & $0.00965$ & $0.01605$ & $0.0523^\circ$ & $0.0938^\circ$ & $0.1665$ & $0.1240$ \\
+        残差 PPO & \good & $0.01127$ & $0.01922$ & $0.7674^\circ$ & $1.4924^\circ$ & $0.4566$ & $0.0578$ \\
+        直接 PPO & \good & $0.00494$ & $0.00897$ & $0.2769^\circ$ & $0.4958^\circ$ & $0.0341$ & $0$ \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
+
+WBC/QP 的姿态精度最好，平顺性指标也最低。这与其显式使用地形曲率前馈一致。不过，其力矩饱和比例达到 $0.1240$，说明膝关节已经频繁接近上限。直接 PPO 的姿态角略大，但高度和速度跟踪更好，且没有出现长期饱和。图~\ref{fig:scene-c1} 中，直接 PPO 的膝关节力矩随地形周期性变化，髋部高度只保留较小幅值的波动。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{C_rough_terrain__wbc_qp.png}
+        \caption{WBC/QP}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{C_rough_terrain__rl_ppo_direct.png}
+        \caption{直接 PPO}
+    \end{subfigure}
+    \caption{场景 C1 的代表性曲线。}
+    \label{fig:scene-c1}
+\end{figure}
+
+\subsection{场景 C2：平滑随机地形}
+
+场景 C2 使用固定种子的平滑噪声地形。与规则正弦地形相比，它不具有单一周期，但经过卷积平滑后局部变化较缓。
+
+\begin{table}[H]
+    \centering
+    \caption{场景 C2：平滑随机地形结果}
+    \label{tab:scene-c2}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        控制器 & 结果 & $\mathrm{RMSE}_h$ & $e_{h,\max}$ &
+        $\mathrm{RMSE}_\theta$ & $\theta_{\max}$ &
+        $\mathrm{RMSE}_v$ & 饱和比例 \\
+        \midrule
+        LQR & \good & $0.00179$ & $0.00573$ & $0.0100^\circ$ & $0.0347^\circ$ & $0.1107$ & $0$ \\
+        WBC/QP & \good & $0.00086$ & $0.00457$ & $7.30\times10^{-6}{}^\circ$ & $2.11\times10^{-5}{}^\circ$ & $0.1680$ & $0.0004$ \\
+        残差 PPO & \good & $0.00796$ & $0.01066$ & $0.7208^\circ$ & $1.4820^\circ$ & $0.2029$ & $0$ \\
+        直接 PPO & \good & $0.00390$ & $0.00758$ & $0.1899^\circ$ & $0.3009^\circ$ & $0.0327$ & $0$ \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
+
+该场景中 LQR 的表现比规则正弦地形更好。这并不矛盾：噪声地形虽然不规则，但平滑后的实际曲率和周期性激励更弱。WBC/QP 仍然取得最小高度与姿态误差；直接 PPO 的速度跟踪最好；残差 PPO 能够完成任务，但姿态精度落后于其他控制器。
+
+\subsection{场景 D：大幅不规则地形}
+
+场景 D 使用三个不同波长的正弦分量叠加，最大绝对高度约 $0.085$ m。它比 C1 和 C2 更接近“连续复杂路面”压力测试。
+
+\begin{table}[H]
+    \centering
+    \caption{场景 D：大幅不规则地形结果}
+    \label{tab:scene-d}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        控制器 & 结果 & $\mathrm{RMSE}_h$ & $e_{h,\max}$ &
+        $\mathrm{RMSE}_\theta$ & $\theta_{\max}$ &
+        $\mathrm{RMSE}_v$ & 饱和比例 \\
+        \midrule
+        LQR & \good & $0.01463$ & $0.03100$ & $0.0793^\circ$ & $0.1696^\circ$ & $0.1714$ & $0$ \\
+        WBC/QP & \good & $0.02418$ & $0.04774$ & $0.1407^\circ$ & $0.3530^\circ$ & $0.1697$ & $0.1573$ \\
+        残差 PPO & \good & $0.01247$ & $0.03044$ & $0.7608^\circ$ & $1.4962^\circ$ & $0.2422$ & $0.0487$ \\
+        直接 PPO & \good & $0.00431$ & $0.01148$ & $0.2470^\circ$ & $0.6107^\circ$ & $0.0343$ & $0.0125$ \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
+
+WBC/QP 在此场景中的高度误差上升到 $0.02418$ m，饱和比例达到 $0.1573$。这说明曲率前馈并不能替代执行器余量：当路面变化更复杂时，局部最优控制会频繁调用膝关节最大力矩，最终高度控制能力下降。直接 PPO 的高度 RMSE 为 $0.00431$ m，速度 RMSE 为 $0.0343$ m/s，仍然保持良好的综合性能。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{D_large_irregular_terrain__wbc_qp.png}
+        \caption{WBC/QP：力矩逐渐接近边界}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{D_large_irregular_terrain__rl_ppo_direct.png}
+        \caption{直接 PPO：保持完整 $8$ s 运行}
+    \end{subfigure}
+    \caption{场景 D 的代表性曲线。}
+    \label{fig:scene-d}
+\end{figure}
+
+\subsection{场景 E：组合越界压力测试}
+
+场景 E 同时包含 $3$ m/s 速度指令、持续 $60$ N 水平力、$t=4$ s 时额外叠加的 $100$ N 脉冲，以及最大绝对高度约 $0.090$ m 的多频不规则地形。峰值水平力达到 $160$ N，因此它比题目规定工况更苛刻。
+
+\begin{table}[H]
+    \centering
+    \caption{场景 E：组合越界压力测试结果}
+    \label{tab:scene-e}
+    \resizebox{\textwidth}{!}{%
+    \begin{tabular}{lccccccc}
+        \toprule
+        控制器 & 结果 & $\mathrm{RMSE}_h$ & $e_{h,\max}$ &
+        $\mathrm{RMSE}_\theta$ & $\theta_{\max}$ &
+        $\mathrm{RMSE}_v$ & 饱和比例 \\
+        \midrule
+        LQR & \good & $0.08454$ & $0.11983$ & $3.2673^\circ$ & $4.4330^\circ$ & $0.2314$ & $0.0470$ \\
+        WBC/QP & \fail & $0.05429$ & $0.14948$ & $0.3078^\circ$ & $0.9094^\circ$ & $0.5773$ & $0.1356$ \\
+        残差 PPO & \good & $0.03339$ & $0.06324$ & $0.4703^\circ$ & $1.2963^\circ$ & $0.3152$ & $0.1631$ \\
+        直接 PPO & \good & $0.01082$ & $0.02820$ & $0.3160^\circ$ & $1.4680^\circ$ & $0.0336$ & $0.1319$ \\
+        \bottomrule
+    \end{tabular}}
+\end{table}
+
+WBC/QP 在约 $1.49$ s 时触发 \code{height_fail}，甚至没有运行到 $t=4$ s 的额外脉冲。图~\ref{fig:scene-e} 左侧可以看到：膝关节力矩多次触及 $160$ N$\cdot$m 上限，髋部高度持续下降，最终逼近 $0.67$ m。此时主要矛盾不是躯干角度，而是腿部支撑能力不足。
+
+LQR 完成了完整 $8$ s 仿真，但高度 RMSE 达到 $0.08454$ m，姿态 RMSE 达到 $3.2673^\circ$。从高稳定运输角度看，这种结果只能算“没有触发硬失败”，不能算理想控制。
+
+残差 PPO 的高度误差明显小于 LQR，但速度 RMSE 仍有 $0.3152$ m/s，饱和比例也达到 $0.1631$。直接 PPO 的表现最均衡：高度 RMSE 为 $0.01082$ m，速度 RMSE 为 $0.0336$ m/s，姿态峰值为 $1.4680^\circ$。图~\ref{fig:scene-e} 右侧显示，其膝关节力矩频繁变化并多次接近上限，但机器人仍能在整个 $8$ s 内保持稳定。
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{E_combined_stress__wbc_qp.png}
+        \caption{WBC/QP：约 $1.49$ s 时高度失败}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.48\textwidth}
+        \centering
+        \includegraphics[width=\linewidth]{E_combined_stress__rl_ppo_direct.png}
+        \caption{直接 PPO：完成完整 $8$ s 仿真}
+    \end{subfigure}
+    \caption{场景 E 的代表性曲线。左图时间轴因提前失败而终止于约 $1.49$ s。}
+    \label{fig:scene-e}
+\end{figure}
+
+\section{方法对比与工程讨论}
+
+\subsection{LQR：适合作为清晰可靠的基线}
+
+LQR 的最大价值是结构简单、可解释、易于调参。在平地、轻度扰动和平滑随机地形中，它可以取得稳定结果。持续推力实验说明，缺少外力补偿和积分环节时，LQR 容易通过高度下降和躯干倾斜换取新的受力平衡。
+
+如果继续改进 LQR，可以考虑：
+
 \begin{itemize}
-    \item \textbf{状态空间 (Observation $\mathcal{S}$)}：包含本体感知数据（关节角度与速度、车轮线速度、IMU 反馈的躯干倾角及角速度）和任务指令（目标速度 $v_{cmd}$）。
-    \item \textbf{动作空间 (Action $\mathcal{A}$)}：策略网络直接输出归一化后的关节驱动力矩 $a_t \in [-1, 1]^3$，经过比例缩放映射到真实的力矩输出 $\tau = a_t \cdot \tau_{max}$。
-    \item \textbf{奖励函数 (Reward $\mathcal{R}$)}：奖励函数的设计直接决定了“端菜”任务的成败。采用严格的指数惩罚形式：
-    $$ r = r_{pose} + r_{height} + r_{vel} + r_{torque} + r_{sat} + r_{fail} $$
-    其中：
-    $$ r_{pose} = w_1 \exp(-k_1 \theta_t^2) \quad \text{(躯干直立奖励)} $$
-    $$ r_{height} = w_2 \exp(-k_2 (y_{hip} - y_{ref})^2) \quad \text{(定高奖励)} $$
-    $$ r_{vel} = w_3 \exp(-k_3 (\dot{x} - v_{cmd})^2) \quad \text{(速度跟踪奖励)} $$
-    $$ r_{torque} = - w_4 \|\tau\|^2 \quad \text{(能耗惩罚)} $$
-    $$ r_{sat} = - w_5 \rho_{sat}, \quad r_{fail} =
-    \begin{cases}
-    -w_6, & \text{触发失稳或接触失败} \\
-    0, & \text{否则}
-    \end{cases} $$
+    \item 加入外力估计器和前馈补偿；
+    \item 引入积分状态，构造 LQI 以减小稳态误差；
+    \item 根据速度和地形状态进行增益调度；
+    \item 使用模型预测控制处理力矩约束。
 \end{itemize}
 
-\subsection{域随机化 (Domain Randomization)}
-为了提高策略面对题干中所述干扰的鲁棒性，在训练过程中引入域随机化技术：随机改变地形起伏的高度（$\pm 0.1$m）、随机改变地面的摩擦系数、在躯干质心施加随机大小和方向的力（模拟 $F \le 100$N 的干扰）。使神经网络学习到在各种极端条件下的隐式重力补偿与姿态恢复策略。
+\subsection{WBC/QP：单步精度高，但需要更严格的约束建模}
 
-\section{鲁棒性分析与对比仿真方案}
-为全面评估上述三种控制算法的实际性能，本文设计了三种典型的干扰仿真实验环境进行鲁棒性压测。
+WBC/QP 在单一扰动场景中表现十分突出，尤其适合直接表达“优先保持高度与姿态”的任务需求。规则正弦地形实验也证明，显式加入地形曲率前馈有助于降低平顺性指标。
 
-\subsection{统一仿真设置与输出内容}
-为保证对比结果公平，三类控制器必须使用相同的机器人参数、地形函数、外力时序、采样周期、力矩上限 $\tau_{max}$ 和失败判据。速度指令 $v_{cmd}$ 采用平滑阶跃或斜坡输入，避免由不连续指令本身引入无意义的瞬时冲击。每次仿真保存如下数据：髋关节位置与速度、躯干角与角速度、三个关节力矩、接触力、地形高度、外部扰动力以及控制器求解状态。
+不过，当前实现仍有几个值得改进的地方：
 
-最终结果以两种形式呈现：一是每个场景下 $y_{hip}$、$\theta_t$、$\dot{x}_{hip}$ 和 $\tau$ 的时间曲线；二是汇总表格，列出 $\text{RMSE}_h$、$e_{h,\max}$、$\text{RMSE}_\theta$、$\theta_{\max}$、$\text{RMSE}_v$、$J$、$E$、$\rho_{sat}$ 和任务是否成功。这样既能看出控制过程的瞬态细节，也能用统一指标完成横向比较。
-
-\subsection{测试场景 A：瞬态强冲击干扰}
-\textbf{环境设置}：机器人在平坦地面以 $2$ m/s 匀速行驶。在 $t=5$ s 时，在躯干质心施加大小为 $100$ N，持续时间为 $0.1$ s 的瞬时水平脉冲力 $F$。 \\
-\textbf{理论分析与预期}：
 \begin{itemize}
-    \item \textbf{LQR}：由于冲击导致状态偏离工作点，躯干会产生剧烈的瞬态晃动（$\theta$ 变大），恢复时间较长，甚至可能出现震荡。
-    \item \textbf{QP / RL}：QP 的动力学约束中显式包含了力矩限制，将以最大可用力矩快速抵消冲击；RL 基于在类似冲击中训练的经验，预期能展现出最小的峰值偏离角和最快的收敛速度。
+    \item 将接触力、关节加速度和力矩共同作为优化变量，而不是只优化三路力矩；
+    \item 将摩擦锥作为显式不等式约束，而不是仅在前向动力学中裁剪；
+    \item 加入腿长、未来高度和力矩余量约束；
+    \item 使用短时域 MPC 或预瞄地形，避免局部优化逐步进入不可恢复状态；
+    \item 记录每次 SLSQP 求解状态和耗时，进一步评价实时性。
 \end{itemize}
 
-\subsection{测试场景 B：持续恒定推力干扰}
-\textbf{环境设置}：机器人在平坦地面以 $3$ m/s 行驶，躯干质心受到 $80$ N 的持续水平力（模拟逆风或持续推拽）。 \\
-\textbf{理论分析与预期}：
+\subsection{残差 PPO：训练容易，性能上限受基础控制器影响}
+
+残差 PPO 的优点是训练稳定。即使训练步数有限，策略也能依靠基础 PD 与重力补偿控制器保持机器人站立和运动。现有输出中，它成功完成全部六个扩展场景。
+
+但残差 PPO 的动作范围只有 $[5,25,25]^\mathsf{T}$ N$\cdot$m，策略只能在基础控制器附近做修正。当基础控制器在复杂地形中的速度和姿态响应并不理想时，残差策略的改进空间受到限制。这是残差 PPO 在多个场景中速度 RMSE 和姿态 RMSE 偏大的主要原因之一。
+
+\subsection{直接 PPO：训练成本高，但当前综合效果最好}
+
+直接 PPO 不依赖固定 PD 基线，能够在整个力矩范围内学习更灵活的控制规律。在现有输出中，它在全部六个场景中保持成功，并取得最低的平均高度 RMSE 和平均速度 RMSE。
+
+它的代价也十分明确：
+
 \begin{itemize}
-    \item \textbf{LQR}：标准 LQR 控制器无法消除恒定干扰带来的稳态误差，躯干将被迫维持一个非零的倾角才能达到受力平衡，无法满足“端菜”的绝对竖直要求。
-    \item \textbf{QP / RL}：QP 若在动力学方程中未能精确估计外部力，也会产生偏差；但可通过引入动量观测器估计 $F_{ext}$ 并作为前馈补偿。RL 通过神经网络的非线性映射能力，可自动学习出身体前倾产生反向力矩或加速车轮的补偿策略。
+    \item 训练难度显著高于残差模式，需要课程式训练和更多采样；
+    \item 动作更活跃，部分场景下平顺性不如 WBC/QP；
+    \item 策略性能依赖训练分布，面对真实系统参数偏差时仍需要系统辨识、域随机化和实机安全约束；
+    \item 神经网络输出缺乏显式可解释约束，部署时应与安全过滤器或备用控制器结合。
 \end{itemize}
 
-\subsection{测试场景 C：连续恶劣地形测试}
-\textbf{环境设置}：地面设置为振幅 $0.05$ m，波长 $1$ m 的正弦波形或柏林噪声地面。 \\
-\textbf{理论分析与预期}：
+\subsection{最佳控制器}
+
+本项目没有一个脱离场景的绝对最佳控制器：
+
 \begin{itemize}
-    \item \textbf{LQR}：几乎必然失效。高度 $y_{hip}$ 将随地面起伏而剧烈波动，RMSE\_h 指标极差。
-    \item \textbf{QP}：表现最佳。依靠精确的运动学逆解，膝关节与髋关节将快速联动，车轮随波峰波谷上下移动，而髋部犹如被固定在滑轨上一般保持绝对高度不变。
-    \item \textbf{RL}：高度表现优异，但相比于 QP 的解析计算，可能会有轻微的神经元输出噪声导致的高频微小抖动（Jerk 指标略低于 QP）。
+    \item 若强调低计算量和可解释性，LQR 是合理基线；
+    \item 若模型可信、地形可测且场景不超过执行器余量，WBC/QP 的姿态控制精度最高；
+    \item 若希望较低训练难度并快速得到可用 RL 策略，残差 PPO 更稳妥；
+    \item 若愿意承担更高训练成本，并追求当前输出中的综合性能，直接 PPO 最有优势。
 \end{itemize}
+
+\section{复现方式与代码索引}
+
+\subsection{依赖安装}
+
+项目依赖见 \code{requirements.txt}。在项目根目录中执行：
+
+\begin{verbatim}
+python -m pip install -r requirements.txt
+\end{verbatim}
+
+\subsection{基础控制器对比}
+
+\begin{verbatim}
+python scripts/run_compare.py ^
+  --controllers lqr wbc_qp rl_random ^
+  --out-dir outputs/check
+\end{verbatim}
+
+其中 \code{rl_random} 只是随机残差动作，用于验证仿真管线，不应作为正式 RL 控制结果。
+
+\subsection{残差 PPO 训练与评估}
+
+\begin{verbatim}
+python scripts/train_rl.py ^
+  --action-mode residual ^
+  --scenario-set random_full ^
+  --timesteps 300000 ^
+  --n-envs 4 ^
+  --save-path outputs/models/ppo_wheel_leg_residual_random
+
+python scripts/run_compare.py ^
+  --controllers lqr wbc_qp rl_ppo ^
+  --residual-model-path outputs/models/ppo_wheel_leg_residual_random ^
+  --out-dir outputs/compare_random_trained
+\end{verbatim}
+
+\subsection{直接 PPO 课程式训练}
+
+\begin{verbatim}
+python scripts/train_rl.py ^
+  --action-mode direct ^
+  --scenario-set random_easy ^
+  --timesteps 1000000 ^
+  --n-envs 8 ^
+  --save-path outputs/models/ppo_wheel_leg_direct_stage1
+
+python scripts/train_rl.py ^
+  --action-mode direct ^
+  --scenario-set random_force ^
+  --load-path outputs/models/ppo_wheel_leg_direct_stage1 ^
+  --timesteps 1000000 ^
+  --n-envs 8 ^
+  --save-path outputs/models/ppo_wheel_leg_direct_stage2
+
+python scripts/train_rl.py ^
+  --action-mode direct ^
+  --scenario-set random_full ^
+  --load-path outputs/models/ppo_wheel_leg_direct_stage2 ^
+  --timesteps 1500000 ^
+  --n-envs 8 ^
+  --save-path outputs/models/ppo_wheel_leg_direct
+\end{verbatim}
+
+\subsection{四控制器扩展对比}
+
+\begin{verbatim}
+python scripts/run_compare.py ^
+  --controllers lqr wbc_qp rl_ppo rl_ppo_direct ^
+  --residual-model-path outputs/models/ppo_wheel_leg_residual_random ^
+  --direct-model-path outputs/models/ppo_wheel_leg_direct ^
+  --out-dir outputs/compare_four_extended
+\end{verbatim}
+
+\subsection{主要源码映射}
+
+\begin{table}[H]
+    \centering
+    \caption{报告内容与源码文件对应关系}
+    \begin{tabularx}{\textwidth}{p{5.2cm}Y}
+        \toprule
+        文件 & 作用 \\
+        \midrule
+        \path{src/config/params.py} & 机器人参数、仿真参数和安全阈值 \\
+        \path{src/config/scenarios.py} & 六个固定测试场景 \\
+        \path{src/config/random_scenarios.py} & PPO 随机训练场景 \\
+        \path{src/model/terrain.py} & 平地、正弦、多正弦和噪声地形 \\
+        \path{src/model/kinematics.py} & 轮心高度、腿长、逆运动学和 RL 观测量 \\
+        \path{src/model/dynamics.py} & 简化动力学、力矩裁剪、RK4 积分、失败检测 \\
+        \path{src/controllers/base.py} & 控制器基类、平衡力矩、基础稳定器和动作映射 \\
+        \path{src/controllers/lqr.py} & 数值线性化和 LQR 控制律 \\
+        \path{src/controllers/wbc_qp.py} & WBC/QP 风格在线优化控制器 \\
+        \path{src/controllers/rl_policy.py} & 随机策略、残差 PPO 和直接 PPO 适配器 \\
+        \path{src/rl/env.py} & Gymnasium 环境与奖励函数 \\
+        \path{src/simulation/runner.py} & 统一仿真循环 \\
+        \path{src/simulation/logger.py} & \code{.npz} 日志存储 \\
+        \path{src/evaluation/metrics.py} & 指标计算 \\
+        \path{src/evaluation/plots.py} & 四联曲线图生成 \\
+        \path{scripts/run_compare.py} & 固定场景批量对比入口 \\
+        \path{scripts/train_rl.py} & PPO 训练入口 \\
+        \path{scripts/eval_rl.py} & 残差 PPO 快捷评估入口 \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
 
 \section{总结}
-针对轮腿机器人的复杂操作需求，本文详细设计了三种控制框架。对比发现：LQR 虽然计算效率极高，但面对地形与强力干扰时表现羸弱，不适合复杂实景；QP/WBC 方法在物理模型精确的前提下，展现了最优的物理极限压榨能力和极致的地形隔离能力，是完成该“端菜”任务的理论最优解；而深度强化学习方法无需精确模型，抗干扰鲁棒性极强，是未来应对非结构化环境的潜力方向。
+
+本文基于当前仓库中的全部核心代码和已有输出，对轮腿机器人姿态与运动控制问题进行了完整梳理。项目采用轻量级二维模型，在统一地形、统一外力、统一力矩限制和统一失败判据下，对 LQR、WBC/QP 风格在线优化、残差 PPO 和直接 PPO 进行了对比。
+
+实验结果表明：
+
+\begin{enumerate}
+    \item LQR 能够作为稳定、易解释的基线控制器，但面对持续外力时存在明显稳态偏差；
+    \item WBC/QP 在单一外力和规则地形中具有极高精度，但在大幅不规则地形和组合压力下需要更严格的预测约束与执行器余量管理；
+    \item 残差 PPO 易于训练，能够稳定完成全部场景，但其性能上限受到基础稳定器结构限制；
+    \item 直接 PPO 训练成本更高，但在现有输出中取得了最佳综合性能，尤其在越界组合压力场景中仍能兼顾高度、姿态和速度跟踪。
+\end{enumerate}
+
+从课程作业角度看，这套代码已经形成了完整闭环：题目要求被转换为参数、场景、动力学、控制器、指标、日志和图像；理论方法也通过真实输出得到了可复核的比较。若进一步面向高保真仿真或实机部署，下一步应加入更完整的刚体动力学、显式接触约束、执行器模型、传感器噪声、参数随机化和安全控制屏障，并保存每次实验的模型哈希、运行命令和随机种子，以提高结果可追溯性。
 
 \end{document}

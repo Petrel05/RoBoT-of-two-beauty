@@ -2,25 +2,91 @@
 \providecommand\hyper@newdestlabel[2]{}
 \providecommand*\HyPL@Entry[1]{}
 \HyPL@Entry{0<</S/D>>}
-\@writefile{toc}{\contentsline {section}{\numberline {1}问题重述与评价指标体系}{3}{section.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}系统描述与控制目标}{3}{subsection.1.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}统一评价指标设计}{3}{subsection.1.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces 轮腿机器人控制算法评价指标体系}}{4}{table.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}失稳与任务失败判据}{4}{subsection.1.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {2}方法一：基于 LQR 的局部最优控制设计}{5}{section.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}非线性动力学建模}{5}{subsection.2.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}工作点线性化}{5}{subsection.2.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}控制器设计}{6}{subsection.2.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {3}方法二：基于二次规划的全身控制设计 (QP/WBC)}{6}{section.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}任务空间定义与优先级划分}{6}{subsection.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}QP 优化问题构建}{7}{subsection.3.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {4}方法三：基于深度强化学习的控制设计 (RL)}{7}{section.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}MDP 模型构建}{8}{subsection.4.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}域随机化 (Domain Randomization)}{8}{subsection.4.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {5}鲁棒性分析与对比仿真方案}{8}{section.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}统一仿真设置与输出内容}{8}{subsection.5.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}测试场景 A：瞬态强冲击干扰}{9}{subsection.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}测试场景 B：持续恒定推力干扰}{9}{subsection.5.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}测试场景 C：连续恶劣地形测试}{9}{subsection.5.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6}总结}{10}{section.6}\protected@file@percent }
-\gdef \@abspage@last{10}
+\@writefile{toc}{\contentsline {section}{\numberline {1}题目重述与研究路线}{4}{section.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.1}题目要求}{4}{subsection.1.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.2}统一参数}{4}{subsection.1.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces 机器人与仿真参数}}{4}{table.caption.2}\protected@file@percent }
+\providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
+\newlabel{tab:params}{{1}{4}{机器人与仿真参数}{table.caption.2}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {1.3}整体实现路线}{5}{subsection.1.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {2}二维仿真模型}{5}{section.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.1}模型边界}{5}{subsection.2.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.2}状态、输入与地形}{5}{subsection.2.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.3}运动学近似}{6}{subsection.2.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.4}简化动力学}{6}{subsection.2.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {2.5}失败判据}{7}{subsection.2.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {3}评价指标与数据记录}{7}{section.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}日志内容}{7}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}核心评价指标}{7}{subsection.3.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces 统一评价指标}}{8}{table.caption.3}\protected@file@percent }
+\newlabel{tab:metrics}{{2}{8}{统一评价指标}{table.caption.3}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}方法一：局部线性化 LQR 控制}{8}{section.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.1}方法思路}{8}{subsection.4.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.2}数值线性化与反馈增益}{8}{subsection.4.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {4.3}实现特点与预期局限}{9}{subsection.4.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}方法二：WBC/QP 控制}{9}{section.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.1}实现形式}{9}{subsection.5.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.2}任务空间目标}{9}{subsection.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.3}在线优化目标}{10}{subsection.5.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {5.4}摩擦处理与局限}{10}{subsection.5.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6}方法三：PPO 强化学习控制}{10}{section.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.1}Gymnasium 环境}{10}{subsection.6.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2}奖励函数}{11}{subsection.6.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3}残差力矩 PPO}{11}{subsection.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.4}直接力矩 PPO}{12}{subsection.6.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5}随机训练场景}{12}{subsection.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7}固定场景与实验设置}{12}{section.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}测试场景}{12}{subsection.7.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces 固定测试场景}}{13}{table.caption.4}\protected@file@percent }
+\newlabel{tab:scenarios}{{3}{13}{固定测试场景}{table.caption.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}对比数据来源}{13}{subsection.7.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8}总体结果}{14}{section.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.1}六场景汇总}{14}{subsection.8.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces 扩展对比实验的六场景汇总}}{14}{table.caption.5}\protected@file@percent }
+\newlabel{tab:aggregate}{{4}{14}{扩展对比实验的六场景汇总}{table.caption.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {8.2}平顺性与能耗的补充观察}{15}{subsection.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}分场景鲁棒性分析}{15}{section.9}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.1}场景 A：瞬态强冲击}{15}{subsection.9.1}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {5}{\ignorespaces 场景 A：瞬态强冲击结果}}{15}{table.caption.6}\protected@file@percent }
+\newlabel{tab:scene-a}{{5}{15}{场景 A：瞬态强冲击结果}{table.caption.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces 场景 A 的代表性曲线。脉冲发生在 $t=5$ s。}}{16}{figure.caption.7}\protected@file@percent }
+\newlabel{fig:scene-a}{{1}{16}{场景 A 的代表性曲线。脉冲发生在 $t=5$ s。}{figure.caption.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.2}场景 B：持续恒定推力}{16}{subsection.9.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6}{\ignorespaces 场景 B：持续恒定推力结果}}{16}{table.caption.8}\protected@file@percent }
+\newlabel{tab:scene-b}{{6}{16}{场景 B：持续恒定推力结果}{table.caption.8}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces 场景 B 的代表性曲线。}}{17}{figure.caption.9}\protected@file@percent }
+\newlabel{fig:scene-b}{{2}{17}{场景 B 的代表性曲线。}{figure.caption.9}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.3}场景 C1：规则正弦地形}{17}{subsection.9.3}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7}{\ignorespaces 场景 C1：规则正弦地形结果}}{17}{table.caption.10}\protected@file@percent }
+\newlabel{tab:scene-c1}{{7}{17}{场景 C1：规则正弦地形结果}{table.caption.10}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces 场景 C1 的代表性曲线。}}{18}{figure.caption.11}\protected@file@percent }
+\newlabel{fig:scene-c1}{{3}{18}{场景 C1 的代表性曲线。}{figure.caption.11}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.4}场景 C2：平滑随机地形}{18}{subsection.9.4}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {8}{\ignorespaces 场景 C2：平滑随机地形结果}}{18}{table.caption.12}\protected@file@percent }
+\newlabel{tab:scene-c2}{{8}{18}{场景 C2：平滑随机地形结果}{table.caption.12}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.5}场景 D：大幅不规则地形}{19}{subsection.9.5}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {9}{\ignorespaces 场景 D：大幅不规则地形结果}}{19}{table.caption.13}\protected@file@percent }
+\newlabel{tab:scene-d}{{9}{19}{场景 D：大幅不规则地形结果}{table.caption.13}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {4}{\ignorespaces 场景 D 的代表性曲线。}}{19}{figure.caption.14}\protected@file@percent }
+\newlabel{fig:scene-d}{{4}{19}{场景 D 的代表性曲线。}{figure.caption.14}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {9.6}场景 E：组合越界压力测试}{20}{subsection.9.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {10}{\ignorespaces 场景 E：组合越界压力测试结果}}{20}{table.caption.15}\protected@file@percent }
+\newlabel{tab:scene-e}{{10}{20}{场景 E：组合越界压力测试结果}{table.caption.15}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {5}{\ignorespaces 场景 E 的代表性曲线。左图时间轴因提前失败而终止于约 $1.49$ s。}}{21}{figure.caption.16}\protected@file@percent }
+\newlabel{fig:scene-e}{{5}{21}{场景 E 的代表性曲线。左图时间轴因提前失败而终止于约 $1.49$ s。}{figure.caption.16}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {10}方法对比与工程讨论}{21}{section.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.1}LQR：适合作为清晰可靠的基线}{21}{subsection.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.2}WBC/QP：单步精度高，但需要更严格的约束建模}{21}{subsection.10.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.3}残差 PPO：训练容易，性能上限受基础控制器影响}{22}{subsection.10.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.4}直接 PPO：训练成本高，但当前综合效果最好}{22}{subsection.10.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {10.5}最佳控制器}{22}{subsection.10.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {11}复现方式与代码索引}{23}{section.11}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.1}依赖安装}{23}{subsection.11.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.2}基础控制器对比}{23}{subsection.11.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.3}残差 PPO 训练与评估}{23}{subsection.11.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.4}直接 PPO 课程式训练}{23}{subsection.11.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.5}四控制器扩展对比}{24}{subsection.11.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {11.6}主要源码映射}{25}{subsection.11.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {11}{\ignorespaces 报告内容与源码文件对应关系}}{25}{table.caption.17}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {12}总结}{25}{section.12}\protected@file@percent }
+\gdef \@abspage@last{26}
