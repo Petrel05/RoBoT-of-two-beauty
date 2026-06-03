@@ -19,3 +19,5 @@ outputs/.cache/
 outputs/.mplconfig/
 outputs/_review*/
 outputs/models/_review*.zip
+outputs/**/logs/
+outputs/**/*.npz
