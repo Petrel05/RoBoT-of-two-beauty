@@ -22,7 +22,7 @@ outputs/compare_four_full_wbc/
 ```text
 outputs/compare_four_full_wbc/
 ├── metrics.csv              # 4 个控制器 x 8 个场景，共 32 行指标
-├── figures/                 # 32 张常规曲线图 + 8 张 WBC/QP 诊断图
+├── figures/                 # 32 张单控制器曲线图 + 8 张四控制器对比图 + 8 张 WBC/QP 诊断图
 └── logs/                    # 32 个原始 .npz 仿真日志
 ```
 
@@ -335,7 +335,7 @@ slack_i >= 0
 - 腿长松弛量；
 - 高度松弛量。
 
-当前问题在数学上是带线性等式和不等式约束的凸二次规划，代码使用 `scipy.optimize.minimize(..., method="SLSQP")` 求解。若候选解出现非有限值、等式残差过大或不等式约束违反量过大，控制器会回退到稳定基线初值。
+当前问题在数学上是带线性等式和不等式约束的凸二次规划，代码将其装配为标准 QP 形式 `0.5 z.T @ P @ z + q.T @ z`、`l <= A @ z <= u`，并使用 OSQP 专用 QP 求解器求解。若候选解出现非有限值、等式残差过大或不等式约束违反量过大，控制器会回退到稳定基线初值。
 
 #### WBC/QP 诊断量
 
@@ -346,6 +346,11 @@ qp_success
 qp_solver_success
 qp_fallback
 qp_iterations
+qp_solver_status_val
+qp_objective
+qp_primal_residual
+qp_dual_residual
+qp_solve_time_ms
 qp_eq_residual
 qp_ineq_violation
 qp_friction_ratio
@@ -531,7 +536,7 @@ rmse_v
 sat_ratio
 ```
 
-内部计算还包含运行时长、jerk、能量和平均力矩范数。WBC/QP 额外输出 QP 可行解比例、求解器收敛比例、回退比例、平均迭代次数、最大残差、最大摩擦利用率和最大安全松弛量。
+内部计算还包含运行时长、jerk、能量和平均力矩范数。WBC/QP 额外输出 QP 可行解比例、OSQP 求解成功比例、回退比例、平均迭代次数、平均/最大求解耗时、最大原始/对偶残差、最大约束残差、最大摩擦利用率和最大安全松弛量。
 
 ### 7.2 日志文件
 
@@ -555,6 +560,12 @@ WBC/QP 专用图像：
 
 ```text
 outputs/<run_name>/figures/<scenario>__wbc_qp__diagnostics.png
+```
+
+多控制器叠加对比图：
+
+```text
+outputs/<run_name>/figures/<scenario>__controller_comparison.png
 ```
 
 ## 8. 生成报告
@@ -632,7 +643,7 @@ RoBoT-of-two-beauty/
 │   │   └── logger.py           # 日志收集与 .npz 保存
 │   └── evaluation/
 │       ├── metrics.py          # 指标计算和 CSV 输出
-│       └── plots.py            # 常规曲线与 WBC/QP 诊断图
+│       └── plots.py            # 常规曲线、四控制器对比图与 WBC/QP 诊断图
 └── outputs/
     ├── models/                 # PPO 模型
     └── compare_four_full_wbc/  # 报告使用的最终统一评估结果
@@ -681,4 +692,4 @@ requirements.txt
 
 ## 12. 实现边界
 
-本项目面向课程报告和控制方法对比，采用二维降阶模型，而不是完整多刚体动力学引擎。当前 WBC/QP 已显式描述任务加速度、接触力、摩擦锥、执行器映射、力矩限制和预测安全约束，但它仍属于与现有降阶仿真匹配的 WBC/QP。若进一步面向高频实时控制，可以引入显式关节坐标、刚体质量矩阵、接触雅可比和专用 QP 求解器，并增加求解耗时统计。
+本项目面向课程报告和控制方法对比，采用二维降阶模型，而不是完整多刚体动力学引擎。当前 WBC/QP 已显式描述任务加速度、接触力、摩擦锥、执行器映射、力矩限制和预测安全约束，并使用 OSQP 专用 QP 求解器求解标准凸 QP；但它仍属于与现有降阶仿真匹配的 WBC/QP。若进一步面向高频实时控制，可以引入显式关节坐标、刚体质量矩阵、接触雅可比，并复用 QP 工作区以降低在线求解开销。

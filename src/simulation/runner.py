@@ -88,6 +88,19 @@ class SimulationRunner:
                 ),
                 qp_fallback=float(diagnostics.get("qp_fallback", np.nan)),
                 qp_iterations=float(diagnostics.get("qp_iterations", np.nan)),
+                qp_solver_status_val=float(
+                    diagnostics.get("qp_solver_status_val", np.nan)
+                ),
+                qp_objective=float(diagnostics.get("qp_objective", np.nan)),
+                qp_primal_residual=float(
+                    diagnostics.get("qp_primal_residual", np.nan)
+                ),
+                qp_dual_residual=float(
+                    diagnostics.get("qp_dual_residual", np.nan)
+                ),
+                qp_solve_time_ms=float(
+                    diagnostics.get("qp_solve_time_ms", np.nan)
+                ),
                 qp_eq_residual=float(diagnostics.get("qp_eq_residual", np.nan)),
                 qp_ineq_violation=float(
                     diagnostics.get("qp_ineq_violation", np.nan)

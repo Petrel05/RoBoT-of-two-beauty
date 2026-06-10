@@ -56,6 +56,18 @@ def compute_metrics(log: SimulationLog, params: RobotParams) -> dict[str, float 
                     "mean_qp_iterations": float(
                         np.mean(data["qp_iterations"][valid_qp])
                     ),
+                    "mean_qp_solve_time_ms": float(
+                        np.mean(data["qp_solve_time_ms"][valid_qp])
+                    ),
+                    "max_qp_solve_time_ms": float(
+                        np.max(data["qp_solve_time_ms"][valid_qp])
+                    ),
+                    "max_qp_primal_residual": float(
+                        np.max(data["qp_primal_residual"][valid_qp])
+                    ),
+                    "max_qp_dual_residual": float(
+                        np.max(data["qp_dual_residual"][valid_qp])
+                    ),
                     "max_qp_eq_residual": float(
                         np.max(data["qp_eq_residual"][valid_qp])
                     ),
@@ -92,6 +104,10 @@ def format_metrics_table(rows: list[dict[str, float | str]]) -> str:
         "qp_solver_success_ratio",
         "qp_fallback_ratio",
         "mean_qp_iterations",
+        "mean_qp_solve_time_ms",
+        "max_qp_solve_time_ms",
+        "max_qp_primal_residual",
+        "max_qp_dual_residual",
         "max_qp_eq_residual",
         "max_qp_ineq_violation",
         "max_qp_friction_ratio",

@@ -1,5 +1,6 @@
 numpy
 scipy
+osqp
 matplotlib
 gymnasium
 stable-baselines3

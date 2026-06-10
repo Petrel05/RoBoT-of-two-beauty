@@ -13,6 +13,15 @@ from src.config.params import RobotParams, SafetyLimits
 from src.simulation.logger import SimulationLog
 
 
+CONTROLLER_LABELS = {
+    "lqr": "LQR",
+    "wbc_qp": "WBC/QP",
+    "rl_ppo": "Residual PPO",
+    "rl_ppo_direct": "Direct PPO",
+    "rl_random": "Random residual",
+}
+
+
 def plot_log(log: SimulationLog, title: str, out_path: str | Path) -> None:
     data = log.to_arrays()
     if not data:
@@ -48,6 +57,51 @@ def plot_log(log: SimulationLog, title: str, out_path: str | Path) -> None:
 
     for ax in axes:
         ax.grid(True, alpha=0.25)
+
+    fig.tight_layout()
+    fig.savefig(out_path, dpi=160)
+    plt.close(fig)
+
+
+def plot_controller_comparison(
+    logs: list[tuple[str, SimulationLog]],
+    title: str,
+    out_path: str | Path,
+) -> None:
+    valid_logs = [(name, log.to_arrays()) for name, log in logs if log.to_arrays()]
+    if not valid_logs:
+        return
+
+    out_path = Path(out_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(4, 1, figsize=(9, 10), sharex=True)
+    fig.suptitle(title)
+
+    reference_drawn = False
+    for name, data in valid_logs:
+        label = CONTROLLER_LABELS.get(name, name)
+        t = data["t"]
+        axes[0].plot(t, data["y"] - data["y_ref"], label=label)
+        axes[1].plot(t, np.rad2deg(data["theta"]), label=label)
+        axes[2].plot(t, data["vx"], label=label)
+        tau = np.vstack([data["tau_wheel"], data["tau_knee"], data["tau_hip"]]).T
+        axes[3].plot(t, np.linalg.norm(tau, axis=1), label=label)
+        if not reference_drawn:
+            axes[0].axhline(0.0, color="tab:gray", linestyle=":", label="height ref")
+            axes[1].axhline(0.0, color="tab:gray", linestyle=":", label="pitch ref")
+            axes[2].plot(t, data["v_cmd"], "--", color="tab:gray", label="v_cmd")
+            reference_drawn = True
+
+    axes[0].set_ylabel("height error (m)")
+    axes[1].set_ylabel("theta (deg)")
+    axes[2].set_ylabel("speed (m/s)")
+    axes[3].set_ylabel("torque norm (Nm)")
+    axes[3].set_xlabel("time (s)")
+
+    for ax in axes:
+        ax.grid(True, alpha=0.25)
+        ax.legend(loc="best")
 
     fig.tight_layout()
     fig.savefig(out_path, dpi=160)

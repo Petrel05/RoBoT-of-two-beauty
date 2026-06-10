@@ -612,11 +612,17 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
     \operatorname{diag}(8,\;180,\;120).
 \end{equation}
 
-当前实现取 $w_\tau=0.03$、$w_{\Delta\tau}=0.12$、$w_f=0.002$、$w_l=4\times10^5$、$w_y=6\times10^5$。程序使用 SciPy 的 SLSQP 求解这一小规模凸二次规划。若候选解的等式残差、线性不等式残差或数值有效性不满足要求，则回退到重新计算的稳定基线，而不是沿用已经恶化的上一时刻力矩。
+当前实现取 $w_\tau=0.03$、$w_{\Delta\tau}=0.12$、$w_f=0.002$、$w_l=4\times10^5$、$w_y=6\times10^5$。程序将该问题装配为标准凸二次规划
+\[
+    \min_z \frac{1}{2} z^\mathsf{T} P z + q^\mathsf{T} z,
+    \qquad
+    l \le A z \le u,
+\]
+并使用 OSQP 专用 QP 求解器求解。等式约束、不等式约束和变量上下界统一进入矩阵 $A$，从而避免把 QP 交给通用非线性 SLSQP 数值优化器。若候选解的等式残差、线性不等式残差或数值有效性不满足要求，则回退到重新计算的稳定基线，而不是沿用已经恶化的上一时刻力矩。
 
 \subsection{诊断信息}
 
-仿真日志新增了 QP 可行解比例、求解器收敛比例、回退比例、迭代次数、最大等式残差、最大不等式残差、摩擦利用率、腿长松弛量、高度松弛量、预测腿长和预测高度。对于 WBC/QP，\code{scripts/run_compare.py} 还会额外生成文件名以 \code{__diagnostics.png} 结尾的约束诊断图。
+仿真日志新增了 QP 可行解比例、OSQP 求解成功比例、回退比例、迭代次数、求解耗时、原始残差、对偶残差、最大等式残差、最大不等式残差、摩擦利用率、腿长松弛量、高度松弛量、预测腿长和预测高度。对于 WBC/QP，\code{scripts/run_compare.py} 还会额外生成文件名以 \code{__diagnostics.png} 结尾的约束诊断图。
 
 \section{方法三：PPO 强化学习控制}
 
@@ -800,7 +806,7 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
 \begin{itemize}
     \item \code{metrics.csv}：四种控制器在八个场景下的 $32$ 行指标；
     \item \code{logs/}：与上述实验逐一对应的 $32$ 个 \code{.npz} 日志；
-    \item \code{figures/}：$32$ 张常规四联曲线图，以及 $8$ 张 WBC/QP 专用约束诊断图。
+    \item \code{figures/}：$32$ 张单控制器常规四联曲线图、$8$ 张四控制器叠加对比图，以及 $8$ 张 WBC/QP 专用约束诊断图。
 \end{itemize}
 
 四种参与对比的控制器为
@@ -850,9 +856,11 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
 
 \begin{enumerate}
     \item LQR 没有在复杂场景中立即失稳，但缺少积分和扰动估计时，高速与持续推力场景的速度误差较大。这说明“成功完成仿真”和“满足高稳定运输要求”不是一回事。
-    \item 显式约束降阶 WBC/QP 在八个场景中均完成任务。全部场景的 QP 可行解比例与 SLSQP 收敛比例均为 $100\%$，回退比例为零；最大等式残差保持在 $1.16\times10^{-12}$ 以内。它的优势主要体现在高度和姿态稳定性，速度 RMSE 并不是所有场景中最低。
+    \item 显式约束降阶 WBC/QP 在八个场景中均完成任务。全部场景的 QP 可行解比例与 OSQP 求解成功比例均为 $100\%$，回退比例为零；最大等式残差保持在 $3.13\times10^{-13}$ 以内，平均求解耗时约为 $0.102$ ms。它的优势主要体现在高度和姿态稳定性，速度 RMSE 并不是所有场景中最低。
     \item 直接 PPO 的平均速度 RMSE 最低，但它并非所有指标上的最佳方法。在高速复合边界场景 G 中，其姿态 RMSE 达到 $4.06^\circ$；若强调平台稳定，WBC/QP 更合适。
 \end{enumerate}
+
+为避免 LQR 和残差 PPO 只出现在表格中，评估脚本还为每个场景生成四控制器叠加图。分场景鲁棒性分析中逐一展示 LQR、WBC/QP、残差 PPO 和直接 PPO 的高度误差、姿态角、速度和力矩范数。
 
 \subsection{平顺性与能耗的补充观察}
 
@@ -880,7 +888,7 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
         $\mathrm{RMSE}_v$ & 饱和比例 \\
         \midrule
         LQR & \good & $0.01313$ & $0.04522$ & $0.1834^\circ$ & $0.5509^\circ$ & $0.2772$ & $0$ \\
-        WBC/QP & \good & $1.05\times10^{-7}$ & $1.29\times10^{-7}$ & $3.40\times10^{-6}{}^\circ$ & $4.62\times10^{-6}{}^\circ$ & $0.1367$ & $0$ \\
+        WBC/QP & \good & $1.12\times10^{-7}$ & $1.30\times10^{-7}$ & $3.20\times10^{-6}{}^\circ$ & $4.54\times10^{-6}{}^\circ$ & $0.1367$ & $0$ \\
         残差 PPO & \good & $0.00627$ & $0.00701$ & $2.1646^\circ$ & $2.3031^\circ$ & $0.2078$ & $0$ \\
         直接 PPO & \good & $0.00119$ & $0.00203$ & $0.4531^\circ$ & $1.7152^\circ$ & $0.0332$ & $0$ \\
         \bottomrule
@@ -888,6 +896,13 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
 \end{table}
 
 四类控制器均完成任务。正式评估中 WBC/QP 并未获得脉冲测量值，但在当前质心外力模型下仍将高度和姿态保持在参考值附近；脉冲主要体现在水平速度瞬态中。直接 PPO 的速度 RMSE 仅为 $0.0332$ m/s。LQR 能够恢复，残差 PPO 也保持稳定，但残差策略的姿态误差较大。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{A_impulse_push__controller_comparison.png}
+    \caption{场景 A 中四种控制器的叠加对比。}
+    \label{fig:scene-a-comparison}
+\end{figure}
 
 \begin{figure}[H]
     \centering
@@ -922,7 +937,7 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
         $\mathrm{RMSE}_v$ & 饱和比例 \\
         \midrule
         LQR & \good & $0.03297$ & $0.03696$ & $0.6128^\circ$ & $0.7267^\circ$ & $0.7162$ & $0$ \\
-        WBC/QP & \good & $1.07\times10^{-7}$ & $1.27\times10^{-7}$ & $2.28\times10^{-6}{}^\circ$ & $4.56\times10^{-6}{}^\circ$ & $0.1947$ & $0$ \\
+        WBC/QP & \good & $1.02\times10^{-7}$ & $1.28\times10^{-7}$ & $2.51\times10^{-6}{}^\circ$ & $4.45\times10^{-6}{}^\circ$ & $0.1947$ & $0$ \\
         残差 PPO & \good & $0.00649$ & $0.00759$ & $2.6128^\circ$ & $2.7524^\circ$ & $0.3780$ & $0$ \\
         直接 PPO & \good & $0.00591$ & $0.00646$ & $1.3826^\circ$ & $1.6187^\circ$ & $0.0374$ & $0$ \\
         \bottomrule
@@ -932,6 +947,13 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
 图~\ref{fig:scene-b} 展示了 LQR 的稳态偏差。由于 LQR 线性化时假设外力为零，并且没有额外积分环节或外力观测器，它只能在新的偏置状态附近达到平衡，速度 RMSE 达到 $0.7162$ m/s。
 
 WBC/QP 的曲线与之形成对比：高度和姿态接近参考值，速度 RMSE 为 $0.1947$ m/s。这里的改进来自速度误差积分与在线约束优化，而不是提前知道真实外力。直接 PPO 对该训练分布适应较好，将速度 RMSE 压缩到 $0.0374$ m/s。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{B_constant_push__controller_comparison.png}
+    \caption{场景 B 中四种控制器的叠加对比。}
+    \label{fig:scene-b-comparison}
+\end{figure}
 
 \begin{figure}[H]
     \centering
@@ -977,6 +999,13 @@ WBC/QP 的高度 RMSE 降至 $0.00020$ m，姿态 RMSE 仅为 $0.0056^\circ$，�
 
 \begin{figure}[H]
     \centering
+    \includegraphics[width=0.92\textwidth]{C_rough_terrain__controller_comparison.png}
+    \caption{场景 C1 中四种控制器的叠加对比。}
+    \label{fig:scene-c1-comparison}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
     \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{C_rough_terrain__wbc_qp.png}
@@ -1017,6 +1046,13 @@ WBC/QP 的高度 RMSE 降至 $0.00020$ m，姿态 RMSE 仅为 $0.0056^\circ$，�
 
 该场景中 LQR 的表现比规则正弦地形更好。这并不矛盾：噪声地形虽然不规则，但卷积与三次样条平滑后，实际曲率和周期性激励更弱。WBC/QP 的高度 RMSE 为 $2.48\times10^{-5}$ m，姿态变化接近数值精度；直接 PPO 的速度跟踪最好；残差 PPO 能够完成任务，但姿态精度落后于其他控制器。
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{C_noise_terrain__controller_comparison.png}
+    \caption{场景 C2 中四种控制器的叠加对比。}
+    \label{fig:scene-c2-comparison}
+\end{figure}
+
 \subsection{场景 D：大幅不规则地形}
 
 场景 D 使用三个不同波长的正弦分量叠加，最大绝对高度约 $0.085$ m。它比 C1 和 C2 更接近“连续复杂路面”压力测试。
@@ -1041,6 +1077,13 @@ WBC/QP 的高度 RMSE 降至 $0.00020$ m，姿态 RMSE 仅为 $0.0056^\circ$，�
 \end{table}
 
 WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$。QP 可行解比例保持 $100\%$，最大摩擦利用率为 $0.7385$。直接 PPO 的速度 RMSE 为 $0.0320$ m/s，但姿态 RMSE 高于 WBC/QP。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{D_large_irregular_terrain__controller_comparison.png}
+    \caption{场景 D 中四种控制器的叠加对比。}
+    \label{fig:scene-d-comparison}
+\end{figure}
 
 \begin{figure}[H]
     \centering
@@ -1086,6 +1129,13 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
 
 \begin{figure}[H]
     \centering
+    \includegraphics[width=0.92\textwidth]{E_combined_stress__controller_comparison.png}
+    \caption{场景 E 中四种控制器的叠加对比。}
+    \label{fig:scene-e-comparison}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
     \begin{subfigure}[t]{0.48\textwidth}
         \centering
         \includegraphics[width=\linewidth]{E_combined_stress__wbc_qp.png}
@@ -1108,7 +1158,7 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
     \label{fig:scene-e-diagnostics}
 \end{figure}
 
-图~\ref{fig:scene-e-diagnostics} 显示，WBC/QP 在场景 E 中的最大摩擦利用率为 $0.7507$。QP 可行解比例和 SLSQP 收敛比例均为 $100\%$，回退比例为零，最大等式残差约为 $5.68\times10^{-14}$，最大不等式违反量为零。高度松弛量仅为 $2.26\times10^{-9}$，说明组合越界压力场景仍处于当前参数设定的可控范围内。
+图~\ref{fig:scene-e-diagnostics} 显示，WBC/QP 在场景 E 中的最大摩擦利用率为 $0.7507$。QP 可行解比例和 OSQP 求解成功比例均为 $100\%$，回退比例为零，最大等式残差约为 $1.14\times10^{-13}$，最大不等式违反量为零。该场景的平均 OSQP 求解耗时约为 $0.124$ ms，最大耗时约为 $1.91$ ms，说明组合越界压力场景仍处于当前参数设定的可控范围内。
 
 \subsection{场景 F：5 m/s 高速平地}
 
@@ -1135,6 +1185,13 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
 
 高速平地中，直接 PPO 的速度跟踪最佳，但四种方法的速度 RMSE 都明显高于中低速场景。这一结果与轮毂力矩上限一致：随着指令速度提高，克服水平阻尼所需的稳态轮毂力矩增加，可用于加速阶段的余量减小。WBC/QP 仍优先保持高度与姿态，因此速度响应相对保守。
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{F_high_speed_flat__controller_comparison.png}
+    \caption{场景 F 中四种控制器的叠加对比。}
+    \label{fig:scene-f-comparison}
+\end{figure}
+
 \subsection{场景 G：题目边界组合测试}
 
 场景 G 同时使用 $5$ m/s 速度指令、持续 $100$ N 水平推力和振幅 $0.05$ m 的正弦地形。与场景 E 的越界压力不同，G 严格落在题目给出的速度和外力范围内，因此它是最重要的要求覆盖测试。
@@ -1159,6 +1216,13 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
 \end{table}
 
 该场景中四种控制器均未触发失败判据，但差异已经十分明显。LQR 的速度 RMSE 超过 $1$ m/s；直接 PPO 仍然保持较好的速度跟踪，却出现 $4.0563^\circ$ 的姿态 RMSE；WBC/QP 的速度响应不如直接 PPO，但高度 RMSE 仅为 $0.00043$ m，姿态 RMSE 仅为 $0.0141^\circ$。对于强调平台稳定的运输任务，WBC/QP 在题目边界工况下更合适。
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.92\textwidth]{G_requirement_boundary__controller_comparison.png}
+    \caption{场景 G 中四种控制器的叠加对比。}
+    \label{fig:scene-g-comparison}
+\end{figure}
 
 \begin{figure}[H]
     \centering
@@ -1200,10 +1264,10 @@ LQR 的最大价值是结构简单、可解释、易于调参。在平地、轻�
 
 \begin{itemize}
     \item 将降阶模型进一步扩展为显式关节坐标的多刚体动力学；
-    \item 使用 OSQP、qpOASES 等专用 QP 求解器，降低 SLSQP 在极端工况中的回退比例；
+    \item 复用 OSQP 工作区和稀疏矩阵结构，进一步减少在线装配和初始化开销；
     \item 把当前单步预瞄扩展为短时域 MPC，同时优化多个未来控制周期；
     \item 为松弛量设置分层优先级，区分“可接受预瞄误差”和“必须立即处理的安全风险”；
-    \item 记录每次 SLSQP 求解状态和耗时，进一步评价实时性。
+    \item 对比 OSQP、qpOASES 等不同专用 QP 求解器在高频控制中的实时性和数值鲁棒性。
 \end{itemize}
 
 \subsection{残差 PPO：训练容易，性能上限受基础控制器影响}

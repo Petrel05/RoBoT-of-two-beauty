@@ -13,6 +13,7 @@ from src.config.scenarios import (
     no_force,
 )
 from src.controllers.base import ControlContext, Controller, equilibrium_torque
+from src.controllers.wbc_qp import WBCQPController
 from src.model.dynamics import accelerations, clip_control, wbc_affine_dynamics
 from src.model.terrain import FlatTerrain, NoiseTerrain, SineTerrain
 from src.simulation.runner import SimulationRunner
@@ -89,6 +90,31 @@ class DynamicsTests(unittest.TestCase):
             atol=1e-10,
             rtol=0.0,
         )
+
+    def test_wbc_qp_solves_with_osqp(self) -> None:
+        controller = WBCQPController(
+            self.params,
+            FlatTerrain(),
+            SafetyLimits(),
+            dt=0.01,
+        )
+        state = np.array([0.0, 0.82, 0.0, 0.4, 0.0, 0.0], dtype=float)
+        context = ControlContext(
+            t=0.0,
+            v_cmd=1.0,
+            y_ref=0.82,
+            external_force_x=0.0,
+        )
+
+        tau = controller.compute(state, context)
+        diagnostics = controller.diagnostics()
+
+        self.assertTrue(np.all(np.isfinite(tau)))
+        self.assertEqual(diagnostics["qp_solver_success"], 1.0)
+        self.assertEqual(diagnostics["qp_fallback"], 0.0)
+        self.assertIn(diagnostics["qp_solver_status_val"], {1.0, 2.0})
+        self.assertLess(diagnostics["qp_eq_residual"], 1e-5)
+        self.assertLess(diagnostics["qp_ineq_violation"], 1e-6)
 
 
 class TerrainTests(unittest.TestCase):

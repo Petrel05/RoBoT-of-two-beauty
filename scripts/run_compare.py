@@ -18,7 +18,11 @@ from src.controllers.rl_policy import (
 )
 from src.controllers.wbc_qp import WBCQPController
 from src.evaluation.metrics import compute_metrics, format_metrics_table
-from src.evaluation.plots import plot_log, plot_wbc_diagnostics
+from src.evaluation.plots import (
+    plot_controller_comparison,
+    plot_log,
+    plot_wbc_diagnostics,
+)
 from src.simulation.runner import SimulationRunner
 
 
@@ -87,6 +91,7 @@ def main() -> None:
     )
     rows = []
     for scenario in default_scenarios():
+        scenario_logs = []
         for controller_name in args.controllers:
             controller = build_controller(
                 controller_name,
@@ -101,6 +106,7 @@ def main() -> None:
                 stop_on_failure=not args.continue_after_failure,
             )
             metrics = compute_metrics(log, ROBOT)
+            scenario_logs.append((controller.name, log))
             row = {
                 "controller": controller.name,
                 "scenario": scenario.name,
@@ -118,6 +124,12 @@ def main() -> None:
                 fig_dir / f"{stem}__diagnostics.png",
             )
             print(f"finished {stem}: success={row['success']} reason={row['failure_reason']}")
+        if len(scenario_logs) > 1:
+            plot_controller_comparison(
+                scenario_logs,
+                f"{scenario.name} controller comparison",
+                fig_dir / f"{scenario.name}__controller_comparison.png",
+            )
 
     table = format_metrics_table(rows)
     (out_dir / "metrics.csv").write_text(table, encoding="utf-8")

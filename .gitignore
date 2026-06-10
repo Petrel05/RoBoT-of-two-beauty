@@ -17,6 +17,7 @@ xelatex*.fls
 
 outputs/.cache/
 outputs/.mplconfig/
+outputs/.mplconfig*/
 outputs/_review*/
 outputs/models/_review*.zip
 outputs/**/logs/

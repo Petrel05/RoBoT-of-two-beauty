@@ -3,7 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-from scipy.optimize import Bounds, LinearConstraint, OptimizeResult, minimize
+import osqp
+from scipy import sparse
 
 from src.config.params import RobotParams, SafetyLimits
 from src.controllers.base import (
@@ -24,6 +25,19 @@ class WBCQPWeights:
     contact_force: float = 0.002
     reachability_slack: float = 4.0e5
     height_slack: float = 6.0e5
+
+
+@dataclass(frozen=True)
+class QPSolveResult:
+    x: np.ndarray
+    success: bool
+    iterations: int
+    status: str
+    status_val: int
+    objective: float
+    primal_residual: float
+    dual_residual: float
+    solve_time: float
 
 
 class WBCQPController(Controller):
@@ -53,6 +67,7 @@ class WBCQPController(Controller):
     HEIGHT_LOW_SLACK = 10
     HEIGHT_HIGH_SLACK = 11
     NVAR = 12
+    OSQP_SOLVED_STATUS_VALUES = {1, 2}
 
     def __init__(
         self,
@@ -186,7 +201,7 @@ class WBCQPController(Controller):
 
         return equality_matrix, equality_rhs, np.vstack(rows), np.array(rhs, dtype=float)
 
-    def _bounds(self) -> Bounds:
+    def _bounds(self) -> tuple[np.ndarray, np.ndarray]:
         lower = np.full(self.NVAR, -np.inf, dtype=float)
         upper = np.full(self.NVAR, np.inf, dtype=float)
 
@@ -198,7 +213,7 @@ class WBCQPController(Controller):
         lower[self.TAU_WHEEL : self.TAU_HIP + 1] = -self.params.tau_limits
         upper[self.TAU_WHEEL : self.TAU_HIP + 1] = self.params.tau_limits
         lower[self.LEG_LOW_SLACK :] = 0.0
-        return Bounds(lower, upper)
+        return lower, upper
 
     def _objective_matrices(
         self,
@@ -248,7 +263,7 @@ class WBCQPController(Controller):
         for index in [self.HEIGHT_LOW_SLACK, self.HEIGHT_HIGH_SLACK]:
             add_weighted_target(index, self.weights.height_slack, 0.0)
 
-        # scipy.optimize uses 0.5 * z.T H z + g.T z.
+        # OSQP uses 0.5 * z.T P z + q.T z.
         return hessian, gradient
 
     @staticmethod
@@ -347,19 +362,113 @@ class WBCQPController(Controller):
         equality_rhs: np.ndarray,
         inequality_matrix: np.ndarray,
         inequality_rhs: np.ndarray,
+        lower_bounds: np.ndarray,
+        upper_bounds: np.ndarray,
     ) -> tuple[float, float]:
         equality_residual = float(
             np.max(np.abs(equality_matrix @ z - equality_rhs))
         )
-        inequality_violation = float(
-            max(np.max(inequality_matrix @ z - inequality_rhs), 0.0)
-        )
+        inequality_violation = float(max(np.max(inequality_matrix @ z - inequality_rhs), 0.0))
+        finite_lower = np.isfinite(lower_bounds)
+        finite_upper = np.isfinite(upper_bounds)
+        if np.any(finite_lower):
+            inequality_violation = max(
+                inequality_violation,
+                float(np.max(lower_bounds[finite_lower] - z[finite_lower])),
+            )
+        if np.any(finite_upper):
+            inequality_violation = max(
+                inequality_violation,
+                float(np.max(z[finite_upper] - upper_bounds[finite_upper])),
+            )
+        inequality_violation = max(inequality_violation, 0.0)
         return equality_residual, inequality_violation
+
+    def _solve_qp(
+        self,
+        hessian: np.ndarray,
+        gradient: np.ndarray,
+        equality_matrix: np.ndarray,
+        equality_rhs: np.ndarray,
+        inequality_matrix: np.ndarray,
+        inequality_rhs: np.ndarray,
+        lower_bounds: np.ndarray,
+        upper_bounds: np.ndarray,
+        initial_guess: np.ndarray,
+    ) -> QPSolveResult:
+        constraint_matrix = sparse.vstack(
+            [
+                sparse.csc_matrix(equality_matrix),
+                sparse.csc_matrix(inequality_matrix),
+                sparse.eye(self.NVAR, format="csc"),
+            ],
+            format="csc",
+        )
+        lower = np.concatenate(
+            [
+                equality_rhs,
+                np.full(inequality_rhs.shape, -np.inf, dtype=float),
+                lower_bounds,
+            ]
+        )
+        upper = np.concatenate([equality_rhs, inequality_rhs, upper_bounds])
+
+        try:
+            solver = osqp.OSQP()
+            solver.setup(
+                P=sparse.csc_matrix(0.5 * (hessian + hessian.T)),
+                q=gradient,
+                A=constraint_matrix,
+                l=lower,
+                u=upper,
+                verbose=False,
+                polishing=True,
+                warm_starting=True,
+                eps_abs=1e-8,
+                eps_rel=1e-8,
+                max_iter=4000,
+            )
+            solver.warm_start(x=initial_guess)
+            raw_result = solver.solve(raise_error=False)
+        except Exception as exc:
+            return QPSolveResult(
+                x=initial_guess.copy(),
+                success=False,
+                iterations=0,
+                status=f"setup_error:{type(exc).__name__}",
+                status_val=-1,
+                objective=float("nan"),
+                primal_residual=float("nan"),
+                dual_residual=float("nan"),
+                solve_time=float("nan"),
+            )
+
+        info = raw_result.info
+        candidate = (
+            np.asarray(raw_result.x, dtype=float)
+            if raw_result.x is not None
+            else initial_guess.copy()
+        )
+        status_val = int(getattr(info, "status_val", -1))
+        solve_time = float(
+            getattr(info, "solve_time", getattr(info, "run_time", float("nan")))
+        )
+        return QPSolveResult(
+            x=candidate,
+            success=status_val in self.OSQP_SOLVED_STATUS_VALUES,
+            iterations=int(getattr(info, "iter", 0)),
+            status=str(getattr(info, "status", "unknown")),
+            status_val=status_val,
+            objective=float(getattr(info, "obj_val", float("nan"))),
+            primal_residual=float(getattr(info, "prim_res", float("nan"))),
+            dual_residual=float(getattr(info, "dual_res", float("nan"))),
+            solve_time=solve_time,
+        )
 
     def _diagnostic_values(
         self,
         z: np.ndarray,
-        result: OptimizeResult,
+        result: QPSolveResult,
         used_fallback: bool,
         state: np.ndarray,
         context: ControlContext,
@@ -368,6 +477,8 @@ class WBCQPController(Controller):
         equality_rhs: np.ndarray,
         inequality_matrix: np.ndarray,
         inequality_rhs: np.ndarray,
+        lower_bounds: np.ndarray,
+        upper_bounds: np.ndarray,
     ) -> dict[str, float]:
         equality_residual, inequality_violation = self._constraint_residuals(
             z,
@@ -375,6 +486,8 @@ class WBCQPController(Controller):
             equality_rhs,
             inequality_matrix,
             inequality_rhs,
+            lower_bounds,
+            upper_bounds,
         )
         leg_row, leg_constant, height_row, height_constant = self._prediction_rows(
             state, context, model
@@ -387,9 +500,14 @@ class WBCQPController(Controller):
         )
         return {
             "qp_success": float(not used_fallback),
-            "qp_solver_success": float(bool(result.success)),
+            "qp_solver_success": float(result.success),
             "qp_fallback": float(used_fallback),
-            "qp_iterations": float(getattr(result, "nit", 0)),
+            "qp_iterations": float(result.iterations),
+            "qp_solver_status_val": float(result.status_val),
+            "qp_objective": float(result.objective),
+            "qp_primal_residual": float(result.primal_residual),
+            "qp_dual_residual": float(result.dual_residual),
+            "qp_solve_time_ms": 1000.0 * float(result.solve_time),
             "qp_eq_residual": equality_residual,
             "qp_ineq_violation": inequality_violation,
             "qp_friction_ratio": friction_ratio,
@@ -415,6 +533,7 @@ class WBCQPController(Controller):
         equality_matrix, equality_rhs, inequality_matrix, inequality_rhs = (
             self._constraints(state, context, model)
         )
+        lower_bounds, upper_bounds = self._bounds()
         last_tau = (
             self._last_tau.copy()
             if self._last_tau is not None
@@ -437,24 +556,16 @@ class WBCQPController(Controller):
             equality_matrix,
             equality_rhs,
         )
-
-        def objective(z: np.ndarray) -> float:
-            return float(0.5 * z @ hessian @ z + gradient @ z)
-
-        def jacobian(z: np.ndarray) -> np.ndarray:
-            return hessian @ z + gradient
-
-        result = minimize(
-            objective,
-            x0=initial_guess,
-            jac=jacobian,
-            method="SLSQP",
-            bounds=self._bounds(),
-            constraints=[
-                LinearConstraint(equality_matrix, equality_rhs, equality_rhs),
-                LinearConstraint(inequality_matrix, -np.inf, inequality_rhs),
-            ],
-            options={"maxiter": 80, "ftol": 1e-9, "disp": False},
+        result = self._solve_qp(
+            hessian,
+            gradient,
+            equality_matrix,
+            equality_rhs,
+            inequality_matrix,
+            inequality_rhs,
+            lower_bounds,
+            upper_bounds,
+            initial_guess,
         )
         candidate = np.asarray(result.x, dtype=float)
         equality_residual, inequality_violation = self._constraint_residuals(
@@ -463,9 +574,12 @@ class WBCQPController(Controller):
             equality_rhs,
             inequality_matrix,
             inequality_rhs,
+            lower_bounds,
+            upper_bounds,
         )
         used_fallback = (
-            not np.all(np.isfinite(candidate))
+            not result.success
+            or not np.all(np.isfinite(candidate))
             or equality_residual > 1e-5
             or inequality_violation > 1e-6
         )
@@ -485,5 +599,7 @@ class WBCQPController(Controller):
             equality_rhs,
             inequality_matrix,
             inequality_rhs,
+            lower_bounds,
+            upper_bounds,
         )
         return tau
