@@ -43,7 +43,7 @@
 \fancyfoot[C]{\thepage}
 \setlength{\headheight}{15pt}
 
-\graphicspath{{outputs/compare_four_full_wbc/figures/}}
+\graphicspath{{outputs/compare_five_full_wbc/figures/}}
 \newcommand{\code}[1]{\texttt{\detokenize{#1}}}
 \newcommand{\good}{\textcolor{darkgreen}{成功}}
 \newcommand{\fail}{\textcolor{darkred}{失败}}
@@ -71,7 +71,7 @@
 然后实现带显式动力学、接触力、摩擦锥、执行器边界和预测安全约束的 WBC/QP 控制器；
 最后实现 PPO 强化学习控制器，并进一步实现残差力矩控制和直接力矩控制两种方法。
 
-本文实验覆盖八类固定测试场景和四种控制器，共计 $32$ 次仿真。正式评估默认不向控制器直接提供真实外力值，
+本文实验覆盖八类固定测试场景和五种控制器，共计 $40$ 次仿真。正式评估默认不向控制器直接提供真实外力值，
 使各方法在统一的盲扰动条件下比较。实验结果表明：四类控制器均完成全部八个场景；
 LQR 结构简单，但在持续外力与 $5$ m/s 边界工况下速度偏差较大；
 显式约束降阶 WBC/QP 的平均高度 RMSE 为 $3.80\times10^{-4}$ m，平均姿态 RMSE 为 $0.0095^\circ$，
@@ -800,17 +800,17 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
 
 \subsection{对比数据来源}
 
-显式约束降阶 WBC/QP 改写后，本文使用同一套脚本重新运行四种控制器，并生成目录
-\path{outputs/compare_four_full_wbc}。该目录包含：
+显式约束降阶 WBC/QP 改写后，本文使用同一套脚本重新运行五种控制器，并生成目录
+\path{outputs/compare_five_full_wbc}。该目录包含：
 
 \begin{itemize}
-    \item \code{metrics.csv}：四种控制器在八个场景下的 $32$ 行指标；
-    \item \code{logs/}：与上述实验逐一对应的 $32$ 个 \code{.npz} 日志；
-    \item \code{figures/}：$32$ 张单控制器常规四联曲线图、$8$ 张四控制器叠加对比图，以及 $8$ 张 WBC/QP 专用约束诊断图。
+    \item \code{metrics.csv}：五种控制器在八个场景下的 $40$ 行指标；
+    \item \code{logs/}：与上述实验逐一对应的 $40$ 个 \code{.npz} 日志；
+    \item \code{figures/}：$40$ 张单控制器常规四联曲线图、$8$ 张五控制器叠加对比图，以及 $8$ 张 WBC/QP 专用约束诊断图。
 \end{itemize}
 
-四种参与对比的控制器为
-\code{lqr}、\code{wbc_qp}、\code{rl_ppo} 和 \code{rl_ppo_direct}。
+五种参与对比的控制器为
+\code{lqr}、\code{wbc_qp}、\code{rl_ppo}、\code{rl_ppo_feedforward} 和 \code{rl_ppo_direct}。
 所有控制器均在八个场景中运行 $8$ s。这样，后续表格和图像全部来自同一次统一评估，
 避免了不同代码版本或不同运行批次对结论造成干扰。
 
@@ -819,7 +819,7 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
 \subsection{八场景汇总}
 
 表~\ref{tab:aggregate} 给出八个固定场景的平均指标。全部数值均来自重新运行后的
-\path{outputs/compare_four_full_wbc/metrics.csv}。
+\path{outputs/compare_five_full_wbc/metrics.csv}。
 
 \begin{table}[H]
     \centering
@@ -845,6 +845,9 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
         残差 PPO
         & $8/8$ & $0.0098$ m & $2.497^\circ$ & $0.370$ m/s & $0.016$
         & 稳定完成任务，但姿态精度受基础稳定器限制 \\
+        前馈残差 PPO
+        & $8/8$ & $0.0187$ m & $4.343^\circ$ & $2.888$ m/s & $0.041$
+        & 概念划分更干净，但同等训练预算下反馈学习难度更高 \\
         直接 PPO
         & $8/8$ & $0.0070$ m & $1.589^\circ$ & $\mathbf{0.082}$ m/s & $0.017$
         & 平均速度跟踪最好，高速边界姿态误差增大 \\
@@ -852,15 +855,16 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
     \end{tabularx}
 \end{table}
 
-从总体结果可以得到三个结论。
+从总体结果可以得到四个结论。
 
 \begin{enumerate}
     \item LQR 没有在复杂场景中立即失稳，但缺少积分和扰动估计时，高速与持续推力场景的速度误差较大。这说明“成功完成仿真”和“满足高稳定运输要求”不是一回事。
     \item 显式约束降阶 WBC/QP 在八个场景中均完成任务。全部场景的 QP 可行解比例与 OSQP 求解成功比例均为 $100\%$，回退比例为零；最大等式残差保持在 $3.13\times10^{-13}$ 以内，平均求解耗时约为 $0.102$ ms。它的优势主要体现在高度和姿态稳定性，速度 RMSE 并不是所有场景中最低。
+    \item 前馈残差 PPO 去除了基础项中的速度、高度和姿态误差反馈，因而更接近“模型前馈 + PPO 反馈残差”的干净结构。它能够完成全部场景，但平均速度 RMSE 明显高于 PD 残差 PPO，说明相同训练预算下 PPO 需要承担更难的反馈稳定任务。
     \item 直接 PPO 的平均速度 RMSE 最低，但它并非所有指标上的最佳方法。在高速复合边界场景 G 中，其姿态 RMSE 达到 $4.06^\circ$；若强调平台稳定，WBC/QP 更合适。
 \end{enumerate}
 
-为避免 LQR 和残差 PPO 只出现在表格中，评估脚本还为每个场景生成四控制器叠加图。分场景鲁棒性分析中逐一展示 LQR、WBC/QP、残差 PPO 和直接 PPO 的高度误差、姿态角、速度和力矩范数。
+为避免 LQR 和各类 PPO 只出现在表格中，评估脚本还为每个场景生成五控制器叠加图。分场景鲁棒性分析中逐一展示 LQR、WBC/QP、残差 PPO、前馈残差 PPO 和直接 PPO 的高度误差、姿态角、速度和力矩范数。
 
 \subsection{平顺性与能耗的补充观察}
 
@@ -895,12 +899,12 @@ QP 对 $l_p$ 和 $y_p$ 设置上下界，并允许使用高代价松弛变量。
     \end{tabular}}
 \end{table}
 
-四类控制器均完成任务。正式评估中 WBC/QP 并未获得脉冲测量值，但在当前质心外力模型下仍将高度和姿态保持在参考值附近；脉冲主要体现在水平速度瞬态中。直接 PPO 的速度 RMSE 仅为 $0.0332$ m/s。LQR 能够恢复，残差 PPO 也保持稳定，但残差策略的姿态误差较大。
+五类控制器均完成任务。正式评估中 WBC/QP 并未获得脉冲测量值，但在当前质心外力模型下仍将高度和姿态保持在参考值附近；脉冲主要体现在水平速度瞬态中。直接 PPO 的速度 RMSE 仅为 $0.0332$ m/s。LQR 能够恢复，残差 PPO 也保持稳定，但残差策略的姿态误差较大。
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{A_impulse_push__controller_comparison.png}
-    \caption{场景 A 中四种控制器的叠加对比。}
+    \caption{场景 A 中五种控制器的叠加对比。}
     \label{fig:scene-a-comparison}
 \end{figure}
 
@@ -951,7 +955,7 @@ WBC/QP 的曲线与之形成对比：高度和姿态接近参考值，速度 RMS
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{B_constant_push__controller_comparison.png}
-    \caption{场景 B 中四种控制器的叠加对比。}
+    \caption{场景 B 中五种控制器的叠加对比。}
     \label{fig:scene-b-comparison}
 \end{figure}
 
@@ -1000,7 +1004,7 @@ WBC/QP 的高度 RMSE 降至 $0.00020$ m，姿态 RMSE 仅为 $0.0056^\circ$，�
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{C_rough_terrain__controller_comparison.png}
-    \caption{场景 C1 中四种控制器的叠加对比。}
+    \caption{场景 C1 中五种控制器的叠加对比。}
     \label{fig:scene-c1-comparison}
 \end{figure}
 
@@ -1049,7 +1053,7 @@ WBC/QP 的高度 RMSE 降至 $0.00020$ m，姿态 RMSE 仅为 $0.0056^\circ$，�
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{C_noise_terrain__controller_comparison.png}
-    \caption{场景 C2 中四种控制器的叠加对比。}
+    \caption{场景 C2 中五种控制器的叠加对比。}
     \label{fig:scene-c2-comparison}
 \end{figure}
 
@@ -1081,7 +1085,7 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{D_large_irregular_terrain__controller_comparison.png}
-    \caption{场景 D 中四种控制器的叠加对比。}
+    \caption{场景 D 中五种控制器的叠加对比。}
     \label{fig:scene-d-comparison}
 \end{figure}
 
@@ -1125,12 +1129,12 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
     \end{tabular}}
 \end{table}
 
-四种控制器都完成了完整 $8$ s 仿真。图~\ref{fig:scene-e} 左侧可以看到：WBC/QP 将髋部高度和姿态保持在参考值附近，速度 RMSE 为 $0.1996$ m/s；最大摩擦利用率为 $0.7507$，仍有余量。LQR 没有触发失败，但速度 RMSE 增至 $0.5833$ m/s。直接 PPO 的速度 RMSE 最低，为 $0.0352$ m/s，不过姿态峰值达到 $2.8508^\circ$。这说明不同控制器的优势已经出现清晰分化：WBC/QP 更偏向平台稳定，直接 PPO 更偏向速度跟踪。
+五种控制器都完成了完整 $8$ s 仿真。图~\ref{fig:scene-e} 左侧可以看到：WBC/QP 将髋部高度和姿态保持在参考值附近，速度 RMSE 为 $0.1996$ m/s；最大摩擦利用率为 $0.7507$，仍有余量。LQR 没有触发失败，但速度 RMSE 增至 $0.5833$ m/s。直接 PPO 的速度 RMSE 最低，为 $0.0352$ m/s，不过姿态峰值达到 $2.8508^\circ$。这说明不同控制器的优势已经出现清晰分化：WBC/QP 更偏向平台稳定，直接 PPO 更偏向速度跟踪。
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{E_combined_stress__controller_comparison.png}
-    \caption{场景 E 中四种控制器的叠加对比。}
+    \caption{场景 E 中五种控制器的叠加对比。}
     \label{fig:scene-e-comparison}
 \end{figure}
 
@@ -1188,7 +1192,7 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{F_high_speed_flat__controller_comparison.png}
-    \caption{场景 F 中四种控制器的叠加对比。}
+    \caption{场景 F 中五种控制器的叠加对比。}
     \label{fig:scene-f-comparison}
 \end{figure}
 
@@ -1215,12 +1219,12 @@ WBC/QP 在此场景中的高度 RMSE 为 $0.00014$ m，饱和比例为 $0.0166$�
     \end{tabular}}
 \end{table}
 
-该场景中四种控制器均未触发失败判据，但差异已经十分明显。LQR 的速度 RMSE 超过 $1$ m/s；直接 PPO 仍然保持较好的速度跟踪，却出现 $4.0563^\circ$ 的姿态 RMSE；WBC/QP 的速度响应不如直接 PPO，但高度 RMSE 仅为 $0.00043$ m，姿态 RMSE 仅为 $0.0141^\circ$。对于强调平台稳定的运输任务，WBC/QP 在题目边界工况下更合适。
+该场景中五种控制器均未触发失败判据，但差异已经十分明显。LQR 的速度 RMSE 超过 $1$ m/s；直接 PPO 仍然保持较好的速度跟踪，却出现 $4.0563^\circ$ 的姿态 RMSE；WBC/QP 的速度响应不如直接 PPO，但高度 RMSE 仅为 $0.00043$ m，姿态 RMSE 仅为 $0.0141^\circ$。对于强调平台稳定的运输任务，WBC/QP 在题目边界工况下更合适。
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.92\textwidth]{G_requirement_boundary__controller_comparison.png}
-    \caption{场景 G 中四种控制器的叠加对比。}
+    \caption{场景 G 中五种控制器的叠加对比。}
     \label{fig:scene-g-comparison}
 \end{figure}
 
@@ -1336,6 +1340,17 @@ python scripts/run_compare.py ^
   --out-dir outputs/compare_random_trained
 \end{verbatim}
 
+\subsection{前馈残差 PPO 训练}
+
+\begin{verbatim}
+python scripts/train_rl.py ^
+  --action-mode feedforward_residual ^
+  --scenario-set random_full ^
+  --timesteps 300000 ^
+  --n-envs 4 ^
+  --save-path outputs/models/ppo_wheel_leg_feedforward_residual_random
+\end{verbatim}
+
 \subsection{直接 PPO 课程式训练}
 
 \begin{verbatim}
@@ -1363,14 +1378,15 @@ python scripts/train_rl.py ^
   --save-path outputs/models/ppo_wheel_leg_direct
 \end{verbatim}
 
-\subsection{四控制器扩展对比}
+\subsection{五控制器扩展对比}
 
 \begin{verbatim}
 python scripts/run_compare.py ^
-  --controllers lqr wbc_qp rl_ppo rl_ppo_direct ^
+  --controllers lqr wbc_qp rl_ppo rl_ppo_feedforward rl_ppo_direct ^
   --residual-model-path outputs/models/ppo_wheel_leg_residual_random ^
+  --feedforward-model-path outputs/models/ppo_wheel_leg_feedforward_residual_random ^
   --direct-model-path outputs/models/ppo_wheel_leg_direct ^
-  --out-dir outputs/compare_four_full_wbc
+  --out-dir outputs/compare_five_full_wbc
 \end{verbatim}
 
 \subsection{回归测试}

@@ -14,7 +14,11 @@ except ImportError as exc:  # pragma: no cover - imported only in RL setup
 from src.config.params import ROBOT, SAFETY, SIM, RobotParams, SafetyLimits, SimParams
 from src.config.random_scenarios import ScenarioSampler
 from src.config.scenarios import Scenario, default_scenarios
-from src.controllers.base import direct_torque_action, residual_torque_action
+from src.controllers.base import (
+    direct_torque_action,
+    feedforward_residual_torque_action,
+    residual_torque_action,
+)
 from src.model.dynamics import accelerations, initial_state, is_failure, rk4_step
 from src.model.kinematics import state_to_observation
 
@@ -34,8 +38,10 @@ class WheelLegRobotEnv(gym.Env):
         provide_force_measurement: bool = False,
     ):
         super().__init__()
-        if action_mode not in {"residual", "direct"}:
-            raise ValueError("action_mode must be 'residual' or 'direct'")
+        if action_mode not in {"residual", "feedforward_residual", "direct"}:
+            raise ValueError(
+                "action_mode must be 'residual', 'feedforward_residual', or 'direct'"
+            )
         self.params = params
         self.sim = sim
         self.safety = safety
@@ -94,6 +100,17 @@ class WheelLegRobotEnv(gym.Env):
                 self.params,
                 measured_force_x,
             )
+        elif self.action_mode == "feedforward_residual":
+            measured_force_x = force_x if self.provide_force_measurement else 0.0
+            tau = feedforward_residual_torque_action(
+                action,
+                self.state,
+                v_cmd,
+                self.sim.y_ref,
+                self.scenario.terrain,
+                self.params,
+                measured_force_x,
+            )
         else:
             tau = direct_torque_action(action, self.params)
 
@@ -121,7 +138,7 @@ class WheelLegRobotEnv(gym.Env):
         reward += 1.2 * np.exp(-0.7 * v_err * v_err)
         reward -= 35.0 * float(y_err * y_err)
         reward -= 3.0 * float(theta * theta)
-        action_cost = 0.03 if self.action_mode == "residual" else 0.008
+        action_cost = 0.03 if self.action_mode != "direct" else 0.008
         reward -= action_cost * float(np.sum(action * action))
         reward -= 0.001 * float(np.sum(acc * acc))
         if self.action_mode == "direct":

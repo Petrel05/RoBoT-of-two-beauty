@@ -13,6 +13,7 @@ from src.config.scenarios import default_scenarios
 from src.controllers.lqr import LQRController
 from src.controllers.rl_policy import (
     DirectPPOController,
+    FeedforwardPPOController,
     RandomPolicyController,
     TrainedPPOController,
 )
@@ -31,6 +32,7 @@ def build_controller(
     scenario,
     model_path: str | None = None,
     residual_model_path: str | None = None,
+    feedforward_model_path: str | None = None,
     direct_model_path: str | None = None,
 ):
     if name == "lqr":
@@ -44,6 +46,13 @@ def build_controller(
         if not path:
             raise ValueError("--model-path is required for rl_ppo")
         return TrainedPPOController(path, ROBOT, scenario.terrain)
+    if name == "rl_ppo_feedforward":
+        path = feedforward_model_path or model_path
+        if not path:
+            raise ValueError(
+                "--feedforward-model-path or --model-path is required for rl_ppo_feedforward"
+            )
+        return FeedforwardPPOController(path, ROBOT, scenario.terrain)
     if name == "rl_ppo_direct":
         path = direct_model_path or model_path
         if not path:
@@ -58,10 +67,18 @@ def main() -> None:
         "--controllers",
         nargs="+",
         default=["lqr", "wbc_qp", "rl_random"],
-        choices=["lqr", "wbc_qp", "rl_random", "rl_ppo", "rl_ppo_direct"],
+        choices=[
+            "lqr",
+            "wbc_qp",
+            "rl_random",
+            "rl_ppo",
+            "rl_ppo_feedforward",
+            "rl_ppo_direct",
+        ],
     )
     parser.add_argument("--model-path", default=None)
     parser.add_argument("--residual-model-path", default=None)
+    parser.add_argument("--feedforward-model-path", default=None)
     parser.add_argument("--direct-model-path", default=None)
     parser.add_argument("--out-dir", default="outputs")
     parser.add_argument(
@@ -98,6 +115,7 @@ def main() -> None:
                 scenario,
                 model_path=args.model_path,
                 residual_model_path=args.residual_model_path,
+                feedforward_model_path=args.feedforward_model_path,
                 direct_model_path=args.direct_model_path,
             )
             log = runner.run(

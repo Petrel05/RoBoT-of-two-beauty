@@ -27,7 +27,11 @@ def main() -> None:
         action="store_true",
         help="Provide exact horizontal disturbances to residual baselines during training.",
     )
-    parser.add_argument("--action-mode", choices=["residual", "direct"], default="residual")
+    parser.add_argument(
+        "--action-mode",
+        choices=["residual", "feedforward_residual", "direct"],
+        default="residual",
+    )
     parser.add_argument(
         "--scenario-set",
         choices=[
@@ -52,14 +56,12 @@ def main() -> None:
             "python -m pip install gymnasium stable-baselines3 torch"
         ) from exc
 
-    save_path = Path(
-        args.save_path
-        or (
-            "outputs/models/ppo_wheel_leg_residual"
-            if args.action_mode == "residual"
-            else "outputs/models/ppo_wheel_leg_direct"
-        )
-    )
+    default_save_paths = {
+        "residual": "outputs/models/ppo_wheel_leg_residual",
+        "feedforward_residual": "outputs/models/ppo_wheel_leg_feedforward_residual",
+        "direct": "outputs/models/ppo_wheel_leg_direct",
+    }
+    save_path = Path(args.save_path or default_save_paths[args.action_mode])
     sampler = training_sampler(args.scenario_set)
     scenarios = None if sampler is not None else training_scenarios(args.scenario_set)
 
@@ -82,8 +84,8 @@ def main() -> None:
         model = load_ppo_model(args.load_path, env=env, device=args.device)
         model.verbose = 1
     else:
-        ent_coef = 0.003 if args.action_mode == "residual" else 0.008
-        learning_rate = 2e-4 if args.action_mode == "residual" else 3e-4
+        ent_coef = 0.003 if args.action_mode != "direct" else 0.008
+        learning_rate = 2e-4 if args.action_mode != "direct" else 3e-4
         model = PPO(
             "MlpPolicy",
             env,

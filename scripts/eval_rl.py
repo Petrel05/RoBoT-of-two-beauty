@@ -15,6 +15,11 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--model-path", required=True)
     parser.add_argument("--out-dir", default="outputs/eval_rl")
+    parser.add_argument(
+        "--controller",
+        choices=["rl_ppo", "rl_ppo_feedforward", "rl_ppo_direct"],
+        default="rl_ppo",
+    )
     args = parser.parse_args()
 
     import sys
@@ -22,7 +27,7 @@ def main() -> None:
     sys.argv = [
         "run_compare.py",
         "--controllers",
-        "rl_ppo",
+        args.controller,
         "--model-path",
         args.model_path,
         "--out-dir",

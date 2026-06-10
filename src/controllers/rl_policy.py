@@ -9,6 +9,7 @@ from src.controllers.base import (
     ControlContext,
     Controller,
     direct_torque_action,
+    feedforward_residual_torque_action,
     residual_torque_action,
 )
 from src.model.kinematics import state_to_observation
@@ -102,6 +103,30 @@ class TrainedPPOController(Controller):
             state,
             context.v_cmd,
             context.y_ref,
+            self.params,
+            context.external_force_x,
+        )
+
+
+class FeedforwardPPOController(Controller):
+    name = "rl_ppo_feedforward"
+
+    def __init__(self, model_path: str, params: RobotParams, terrain: Terrain):
+        self.model = load_ppo_model(model_path)
+        self.params = params
+        self.terrain = terrain
+
+    def compute(self, state: np.ndarray, context: ControlContext) -> np.ndarray:
+        obs = state_to_observation(
+            state, context.v_cmd, context.y_ref, self.terrain, self.params
+        )
+        action, _ = self.model.predict(obs, deterministic=True)
+        return feedforward_residual_torque_action(
+            action,
+            state,
+            context.v_cmd,
+            context.y_ref,
+            self.terrain,
             self.params,
             context.external_force_x,
         )

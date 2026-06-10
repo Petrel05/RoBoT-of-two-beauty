@@ -5,6 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 
 from src.config.params import RobotParams
+from src.model.kinematics import wheel_center_y
+from src.model.terrain import Terrain
 
 
 @dataclass(frozen=True)
@@ -60,6 +62,23 @@ def residual_torque_action(
     return clip_tau(tau, params)
 
 
+def feedforward_residual_torque_action(
+    action: np.ndarray,
+    state: np.ndarray,
+    v_cmd: float,
+    y_ref: float,
+    terrain: Terrain,
+    params: RobotParams,
+    external_force_x: float = 0.0,
+) -> np.ndarray:
+    action = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
+    base = model_feedforward_torque(
+        state, v_cmd, y_ref, terrain, params, external_force_x
+    )
+    tau = base + action * params.rl_residual_scale
+    return clip_tau(tau, params)
+
+
 def direct_torque_action(action: np.ndarray, params: RobotParams) -> np.ndarray:
     action = np.clip(np.asarray(action, dtype=float), -1.0, 1.0)
     tau_wheel = action[0] * params.tau_limits[0]
@@ -83,6 +102,41 @@ def distribute_leg_torque(
     )
     knee, hip = np.linalg.solve(matrix, rhs)
     return float(knee), float(hip)
+
+
+def model_feedforward_torque(
+    state: np.ndarray,
+    v_cmd: float,
+    y_ref: float,
+    terrain: Terrain,
+    params: RobotParams,
+    external_force_x: float = 0.0,
+) -> np.ndarray:
+    x = float(np.asarray(state, dtype=float)[0])
+    slope = float(terrain.slope(x))
+    wheel_y = wheel_center_y(x, terrain, params)
+    nominal_leg_length = float(y_ref - wheel_y)
+    nominal_leg_rate = -slope * v_cmd
+
+    contact_tangent = (
+        params.x_damping * v_cmd
+        + params.mass * params.gravity * slope
+        - external_force_x
+    )
+    contact_normal = params.mass * params.gravity
+    passive_leg_force = (
+        params.leg_stiffness * (params.nominal_leg_length - nominal_leg_length)
+        - params.leg_damping * nominal_leg_rate
+    )
+    active_leg_force = contact_normal - passive_leg_force
+    contact_moment_arm = params.contact_pitch_coupling * max(
+        y_ref - terrain.height(x), 0.1
+    )
+    joint_pitch_moment = -contact_moment_arm * contact_tangent
+
+    tau_wheel = params.wheel_radius * contact_tangent
+    knee, hip = distribute_leg_torque(active_leg_force, joint_pitch_moment, params)
+    return clip_tau(np.array([tau_wheel, knee, hip], dtype=float), params)
 
 
 def stabilizing_baseline_torque(

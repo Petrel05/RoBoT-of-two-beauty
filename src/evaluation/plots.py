@@ -17,6 +17,7 @@ CONTROLLER_LABELS = {
     "lqr": "LQR",
     "wbc_qp": "WBC/QP",
     "rl_ppo": "Residual PPO",
+    "rl_ppo_feedforward": "Feedforward PPO",
     "rl_ppo_direct": "Direct PPO",
     "rl_random": "Random residual",
 }
