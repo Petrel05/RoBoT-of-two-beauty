@@ -1,5 +1,5 @@
 % !TeX program = xelatex
-\documentclass[UTF8,12pt,a4paper]{ctexart}
+\documentclass[UTF8,12pt,a4paper,fontset=none]{ctexart}
 
 \usepackage{amsmath,amssymb,mathtools,bm}
 \usepackage{graphicx}
@@ -17,6 +17,14 @@
 \usepackage{siunitx}
 \usepackage{microtype}
 \usepackage{url}
+
+\setCJKmainfont{Songti SC}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+\setCJKsansfont{PingFang SC}[AutoFakeBold=2.5]
+\setCJKmonofont{Songti SC}
+\setCJKfamilyfont{zhsong}{Songti SC}[AutoFakeBold=2.5]
+\setCJKfamilyfont{zhhei}{PingFang SC}[AutoFakeBold=2.5]
+\setCJKfamilyfont{zhkai}{Songti SC}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+\setCJKfamilyfont{zhfs}{Songti SC}[AutoFakeBold=2.5]
 
 \geometry{left=2.35cm,right=2.35cm,top=2.35cm,bottom=2.45cm,headheight=15pt}
 \setlength{\parindent}{2em}
@@ -49,26 +57,39 @@
 \fancyfoot[C]{\thepage}
 
 \ctexset{
-  section={format=\Large\bfseries\color{deepblue},beforeskip=1.1em,afterskip=0.7em},
-  subsection={format=\large\bfseries,beforeskip=0.9em,afterskip=0.45em}
+  section={format=\Large\bfseries\color{deepblue},beforeskip=0.95em,afterskip=0.55em},
+  subsection={format=\large\bfseries,beforeskip=0.72em,afterskip=0.35em}
 }
-\captionsetup{font=small,labelfont=bf,skip=6pt}
-\captionsetup[subfigure]{font=footnotesize,skip=3pt}
+\captionsetup{font=small,labelfont=bf,skip=4pt}
+\captionsetup[subfigure]{font=footnotesize,skip=2pt}
 \sisetup{detect-all,per-mode=symbol}
-\setlength{\textfloatsep}{0.75em plus 0.2em minus 0.2em}
-\setlength{\floatsep}{0.65em plus 0.2em minus 0.2em}
-\setlength{\intextsep}{0.75em plus 0.2em minus 0.2em}
+\setlength{\textfloatsep}{0.45em plus 0.15em minus 0.15em}
+\setlength{\floatsep}{0.38em plus 0.15em minus 0.15em}
+\setlength{\intextsep}{0.45em plus 0.15em minus 0.15em}
+\renewcommand{\topfraction}{0.92}
+\renewcommand{\bottomfraction}{0.82}
+\renewcommand{\textfraction}{0.06}
+\renewcommand{\floatpagefraction}{0.78}
+\setcounter{topnumber}{4}
+\setcounter{bottomnumber}{3}
+\setcounter{totalnumber}{5}
+\makeatletter
+\setlength{\@fptop}{0pt}
+\setlength{\@fpsep}{0.8em plus 2fil}
+\setlength{\@fpbot}{0pt plus 1fil}
+\makeatother
 
 \graphicspath{{outputs/compare_five_full_wbc/figures/}}
 \newcommand{\code}[1]{\texttt{\detokenize{#1}}}
 \newcommand{\good}{\textcolor{darkgreen}{未终止}}
 \newcommand{\bad}{\textcolor{darkred}{终止}}
-\newcommand{\comparisonfigwidth}{0.86\linewidth}
+\newcommand{\comparisonfigwidth}{0.72\linewidth}
+\newcommand{\pairedfigheight}{0.25\textheight}
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
 \newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
 
 \lstdefinestyle{cmd}{
-  basicstyle=\ttfamily\small,
+  basicstyle=\ttfamily\footnotesize,
   backgroundcolor=\color{softgray},
   frame=single,
   rulecolor=\color{black!20},
@@ -76,6 +97,8 @@
   columns=fullflexible,
   keepspaces=true,
   showstringspaces=false,
+  aboveskip=0.4em,
+  belowskip=0.4em,
   xleftmargin=0.5em,
   xrightmargin=0.5em
 }
@@ -771,7 +794,7 @@ WBC/QP 的平均高度 RMSE 为 \SI{0.00038}{m}，平均姿态 RMSE 为 \SI{0.00
 以及控制量变化。表格给出全时域统计量，用于和曲线中的局部现象对应。
 
 \subsection{场景 A：瞬态强冲击}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 A 主要控制器结果}
 \label{tab:scene-a}
@@ -788,7 +811,7 @@ PD 残差 PPO & \good & 0.00627 & 0.00701 & $2.1646^\circ$ & $2.3031^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{A_impulse_push__controller_comparison.png}
 \caption{场景 A 的五控制器叠加曲线。冲击发生在 $t=\SI{5}{s}$；启动阶段对高度和速度误差的贡献大于短脉冲本身。}
@@ -806,22 +829,23 @@ $1.12\times10^{-7}$ m，姿态 RMSE 为 $3.20\times10^{-6}$ 度，平地条件�
 PD 残差 PPO 的高度 RMSE 为 \SI{0.00627}{m}，姿态 RMSE 为 \SI{2.1646}{\degree}，在该场景中主要表现为
 启动阶段的姿态偏差。
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{A_impulse_push__lqr.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{A_impulse_push__lqr.png}
 \caption{LQR}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{A_impulse_push__rl_ppo_direct.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{A_impulse_push__rl_ppo_direct.png}
 \caption{直接 PPO}
 \end{subfigure}
 \caption{场景 A 的单控制器曲线。}
 \label{fig:scene-a}
 \end{figure}
 
+\FloatBarrier
 \subsection{场景 B：持续恒定推力}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 B 主要控制器结果}
 \label{tab:scene-b}
@@ -838,7 +862,7 @@ PD 残差 PPO & \good & 0.00649 & 0.00759 & $2.6128^\circ$ & $2.7524^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{B_constant_push__controller_comparison.png}
 \caption{场景 B 的五控制器叠加曲线。前馈残差方案虽未触发姿态和高度阈值，但速度持续偏离指令。}
@@ -855,22 +879,23 @@ WBC/QP 的速度 RMSE 降至 \SI{0.1947}{m/s}，同时高度和姿态误差仍�
 \SI{1.3826}{\degree}。PD 残差 PPO 的速度 RMSE 为 \SI{0.3780}{m/s}，姿态 RMSE 为
 \SI{2.6128}{\degree}。该场景主要区分了控制器对持续水平扰动的速度补偿能力。
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{B_constant_push__lqr.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{B_constant_push__lqr.png}
 \caption{LQR：存在持续偏差}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{B_constant_push__wbc_qp.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{B_constant_push__wbc_qp.png}
 \caption{WBC/QP：平台通道接近名义值}
 \end{subfigure}
 \caption{场景 B 的代表性单控制器曲线。}
 \label{fig:scene-b}
 \end{figure}
 
+\FloatBarrier
 \subsection{场景 C1：规则正弦地形}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 C1 主要控制器结果}
 \label{tab:scene-c1}
@@ -887,7 +912,7 @@ PD 残差 PPO & \good & 0.01607 & 0.06504 & $2.2118^\circ$ & $2.6033^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{C_rough_terrain__controller_comparison.png}
 \caption{场景 C1 的五控制器叠加曲线。周期地形导致 LQR、两种残差方案和直接 PPO 出现不同幅值的周期响应。}
@@ -905,22 +930,23 @@ PD 残差 PPO & \good & 0.01607 & 0.06504 & $2.2118^\circ$ & $2.6033^\circ$ & 0.
 \SI{0.03514}{m}，最大高度误差达到 \SI{0.11996}{m}，这与图中周期性高度误差相对应。PD 残差 PPO 的高度 RMSE 为
 \SI{0.01607}{m}，介于 LQR 和直接 PPO 之间。
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{C_rough_terrain__wbc_qp.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{C_rough_terrain__wbc_qp.png}
 \caption{WBC/QP}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{C_rough_terrain__rl_ppo_direct.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{C_rough_terrain__rl_ppo_direct.png}
 \caption{直接 PPO}
 \end{subfigure}
 \caption{场景 C1 的代表性单控制器曲线。}
 \label{fig:scene-c1}
 \end{figure}
 
+\FloatBarrier
 \subsection{场景 C2：平滑随机地形}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 C2 主要控制器结果}
 \label{tab:scene-c2}
@@ -937,7 +963,7 @@ PD 残差 PPO & \good & 0.00772 & 0.01265 & $2.1624^\circ$ & $2.3101^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{C_noise_terrain__controller_comparison.png}
 \caption{场景 C2 的五控制器叠加曲线。该固定随机地形经平滑后局部变化较缓。}
@@ -955,8 +981,9 @@ LQR 的高度 RMSE 为 \SI{0.01669}{m}，速度 RMSE 为 \SI{0.2650}{m/s}；PD �
 \SI{0.00772}{m}，速度 RMSE 为 \SI{0.2038}{m/s}。与 C1 相比，本固定随机地形的坡度变化更缓，因此各控制器的
 高度误差和速度误差整体较小。
 
+\FloatBarrier
 \subsection{场景 D：大幅不规则地形}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 D 主要控制器结果}
 \label{tab:scene-d}
@@ -973,7 +1000,7 @@ PD 残差 PPO & \good & 0.00697 & 0.01437 & $2.1900^\circ$ & $2.3764^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{D_large_irregular_terrain__controller_comparison.png}
 \caption{场景 D 的五控制器叠加曲线。多频地形使力矩范数呈非周期变化。}
@@ -990,22 +1017,23 @@ PD 残差 PPO & \good & 0.00697 & 0.01437 & $2.1900^\circ$ & $2.3764^\circ$ & 0.
 \SI{0.00137}{m}，姿态 RMSE 为 \SI{0.9500}{\degree}。LQR 的高度 RMSE 为 \SI{0.01225}{m}，PD 残差 PPO 为
 \SI{0.00697}{m}。从图和表同时看，WBC/QP 主要压低平台误差，直接 PPO 主要压低速度误差。
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{D_large_irregular_terrain__wbc_qp.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{D_large_irregular_terrain__wbc_qp.png}
 \caption{WBC/QP}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{D_large_irregular_terrain__rl_ppo_direct.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{D_large_irregular_terrain__rl_ppo_direct.png}
 \caption{直接 PPO}
 \end{subfigure}
 \caption{场景 D 的代表性单控制器曲线。}
 \label{fig:scene-d}
 \end{figure}
 
+\FloatBarrier
 \subsection{场景 E：超规格组合压力}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 E 主要控制器结果}
 \label{tab:scene-e}
@@ -1022,7 +1050,7 @@ PD 残差 PPO & \good & 0.00683 & 0.01267 & $2.6151^\circ$ & $2.7948^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{E_combined_stress__controller_comparison.png}
 \caption{场景 E 的五控制器叠加曲线。该场景峰值外力为 \SI{160}{N}，超出题目上限。}
@@ -1040,23 +1068,23 @@ PD 残差 PPO & \good & 0.00683 & 0.01267 & $2.6151^\circ$ & $2.7948^\circ$ & 0.
 RMSE 为 \SI{0.5833}{m/s}，PD 残差 PPO 为 \SI{0.3187}{m/s}。该场景超出题目外力上限，因此它在本文中用于观察
 组合扰动下的响应形态，而不作为题目范围内的性能边界。
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{E_combined_stress__wbc_qp.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{E_combined_stress__wbc_qp.png}
 \caption{WBC/QP}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{E_combined_stress__rl_ppo_direct.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{E_combined_stress__rl_ppo_direct.png}
 \caption{直接 PPO}
 \end{subfigure}
 \caption{场景 E 的代表性单控制器曲线。}
 \label{fig:scene-e}
 \end{figure}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
-\includegraphics[width=0.86\linewidth]{E_combined_stress__wbc_qp__diagnostics.png}
+\includegraphics[width=\comparisonfigwidth]{E_combined_stress__wbc_qp__diagnostics.png}
 \caption{场景 E 的 WBC/QP 诊断图：接触力与摩擦边界、实际与预测腿长、残差与松弛量、摩擦利用率和求解状态。}
 \label{fig:scene-e-diagnostics}
 \end{figure}
@@ -1066,8 +1094,9 @@ RMSE 为 \SI{0.5833}{m/s}，PD 残差 PPO 为 \SI{0.3187}{m/s}。该场景超出
 $100\%$ 成功，最大等式残差约 $1.14\times10^{-13}$，不等式违反量为零。平均 OSQP 求解耗时约
 \SI{0.078}{ms}，最大约 \SI{1.31}{ms}。这些数值对应当前电脑、当前轨迹和当前降阶模型下的求解记录。
 
+\FloatBarrier
 \subsection{场景 F：\SI{5}{m/s} 高速平地}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 F 主要控制器结果}
 \label{tab:scene-f}
@@ -1084,7 +1113,7 @@ PD 残差 PPO & \good & 0.01743 & 0.06957 & $3.0037^\circ$ & $4.0707^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{F_high_speed_flat__controller_comparison.png}
 \caption{场景 F 的五控制器叠加曲线。速度 RMSE 包含从初始速度到 \SI{5}{m/s} 的完整启动过程。}
@@ -1102,8 +1131,9 @@ PD 残差 PPO & \good & 0.01743 & 0.06957 & $3.0037^\circ$ & $4.0707^\circ$ & 0.
 LQR 的最大高度误差达到 \SI{0.11163}{m}，对应图中启动阶段的明显下沉。高速场景中，速度响应和平台姿态之间的
 分配差异比中低速场景更突出。
 
+\FloatBarrier
 \subsection{场景 G：题目边界组合}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{场景 G 主要控制器结果}
 \label{tab:scene-g}
@@ -1120,7 +1150,7 @@ PD 残差 PPO & \good & 0.01070 & 0.04017 & $3.0175^\circ$ & $3.4555^\circ$ & 0.
 \end{tabular}
 \end{table}
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \includegraphics[width=\comparisonfigwidth]{G_requirement_boundary__controller_comparison.png}
 \caption{场景 G 的五控制器叠加曲线。该场景同时达到题目规定的速度和外力上限。}
@@ -1138,20 +1168,21 @@ PD 残差 PPO & \good & 0.01070 & 0.04017 & $3.0175^\circ$ & $3.4555^\circ$ & 0.
 PD 残差 PPO 的速度 RMSE 为 \SI{0.6364}{m/s}，姿态 RMSE 为 \SI{3.0175}{\degree}。在最高速度、最大外力和
 不平地形同时出现时，表格和曲线都显示出两类结果：WBC/QP 保持平台高度和姿态，直接 PPO 保持较低速度误差。
 
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{G_requirement_boundary__wbc_qp.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{G_requirement_boundary__wbc_qp.png}
 \caption{WBC/QP：平台稳定优先}
 \end{subfigure}\hfill
 \begin{subfigure}[t]{0.48\linewidth}
-\centering\includegraphics[width=\linewidth]{G_requirement_boundary__rl_ppo_direct.png}
+\centering\includegraphics[width=\linewidth,height=\pairedfigheight,keepaspectratio]{G_requirement_boundary__rl_ppo_direct.png}
 \caption{直接 PPO：速度优先、姿态波动较大}
 \end{subfigure}
 \caption{场景 G 的代表性单控制器曲线。}
 \label{fig:scene-g}
 \end{figure}
 
+\FloatBarrier
 \section{控制器比较与实现改进}
 
 \subsection{LQR}
@@ -1221,12 +1252,12 @@ python -B -m unittest discover -s tests -v
 
 
 \subsection{主要源码映射}
-\begin{table}[H]
+\begin{table}[!htb]
 \centering
 \caption{报告内容与源码文件对应关系}
 \label{tab:codemap}
-\small
-\begin{tabularx}{\linewidth}{p{5.2cm}Y}
+\footnotesize
+\begin{tabularx}{\linewidth}{p{6.8cm}Y}
 \toprule
 文件 & 作用 \\
 \midrule
@@ -1263,7 +1294,6 @@ python -B -m unittest discover -s tests -v
 从题目目标出发，推荐采用 WBC/QP 作为主要控制器，并把 LQR 用作简洁基线，把 PPO 用作速度补偿或策略对照。
 该结论只对当前模型、权重、限幅和八个测试场景成立。
 
-\clearpage
 \addcontentsline{toc}{section}{参考文献}
 \begin{thebibliography}{99}
 
