@@ -22,6 +22,12 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--n-envs", type=int, default=4)
     parser.add_argument("--device", default="auto")
+    parser.add_argument("--learning-rate", type=float, default=None)
+    parser.add_argument("--ent-coef", type=float, default=None)
+    parser.add_argument("--action-cost", type=float, default=None)
+    parser.add_argument("--direct-torque-cost", type=float, default=None)
+    parser.add_argument("--verbose", type=int, default=1)
+    parser.add_argument("--no-progress-bar", action="store_true")
     parser.add_argument(
         "--provide-force-measurement",
         action="store_true",
@@ -74,6 +80,8 @@ def main() -> None:
                     seed=args.seed + rank,
                     action_mode=args.action_mode,
                     provide_force_measurement=args.provide_force_measurement,
+                    action_cost=args.action_cost,
+                    direct_torque_cost=args.direct_torque_cost,
                 )
             )
 
@@ -82,10 +90,18 @@ def main() -> None:
     env = DummyVecEnv([make_env(i) for i in range(args.n_envs)])
     if args.load_path:
         model = load_ppo_model(args.load_path, env=env, device=args.device)
-        model.verbose = 1
+        model.verbose = args.verbose
     else:
-        ent_coef = 0.003 if args.action_mode != "direct" else 0.008
-        learning_rate = 2e-4 if args.action_mode != "direct" else 3e-4
+        ent_coef = (
+            args.ent_coef
+            if args.ent_coef is not None
+            else (0.003 if args.action_mode != "direct" else 0.008)
+        )
+        learning_rate = (
+            args.learning_rate
+            if args.learning_rate is not None
+            else (2e-4 if args.action_mode != "direct" else 3e-4)
+        )
         model = PPO(
             "MlpPolicy",
             env,
@@ -96,11 +112,11 @@ def main() -> None:
             gae_lambda=0.95,
             clip_range=0.2,
             ent_coef=ent_coef,
-            verbose=1,
+            verbose=args.verbose,
             seed=args.seed,
             device=args.device,
         )
-    model.learn(total_timesteps=args.timesteps, progress_bar=True)
+    model.learn(total_timesteps=args.timesteps, progress_bar=not args.no_progress_bar)
     save_path.parent.mkdir(parents=True, exist_ok=True)
     model.save(str(save_path))
     print(f"Saved PPO model to {save_path}")

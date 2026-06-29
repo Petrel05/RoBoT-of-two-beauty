@@ -137,6 +137,27 @@ def default_scenarios() -> list[Scenario]:
     ]
 
 
+def static_push_scenarios() -> list[Scenario]:
+    return [
+        Scenario(
+            name="H0_static_impulse_push",
+            duration=8.0,
+            v_cmd=constant_speed(0.0),
+            force_x=pulse_force(start=4.0, duration=0.1, magnitude=100.0),
+            terrain=FlatTerrain(),
+            description="Standing on flat ground with a 100 N, 0.1 s horizontal impulse.",
+        ),
+        Scenario(
+            name="H1_static_constant_push",
+            duration=8.0,
+            v_cmd=constant_speed(0.0),
+            force_x=constant_force(100.0),
+            terrain=FlatTerrain(),
+            description="Standing on flat ground with a persistent 100 N horizontal force.",
+        ),
+    ]
+
+
 def easy_training_scenarios() -> list[Scenario]:
     return [
         Scenario(

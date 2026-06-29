@@ -9,7 +9,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.config.params import ROBOT, SAFETY, SIM
-from src.config.scenarios import default_scenarios
+from src.config.scenarios import default_scenarios, static_push_scenarios
 from src.controllers.lqr import LQRController
 from src.controllers.rl_policy import (
     DirectPPOController,
@@ -82,6 +82,11 @@ def main() -> None:
     parser.add_argument("--direct-model-path", default=None)
     parser.add_argument("--out-dir", default="outputs")
     parser.add_argument(
+        "--scenario-set",
+        choices=["default", "static_push"],
+        default="default",
+    )
+    parser.add_argument(
         "--provide-force-measurement",
         action="store_true",
         help="Provide the exact horizontal disturbance to controllers that support it.",
@@ -107,7 +112,12 @@ def main() -> None:
         provide_force_measurement=args.provide_force_measurement,
     )
     rows = []
-    for scenario in default_scenarios():
+    scenarios = (
+        static_push_scenarios()
+        if args.scenario_set == "static_push"
+        else default_scenarios()
+    )
+    for scenario in scenarios:
         scenario_logs = []
         for controller_name in args.controllers:
             controller = build_controller(

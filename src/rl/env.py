@@ -36,6 +36,8 @@ class WheelLegRobotEnv(gym.Env):
         seed: int | None = None,
         action_mode: str = "residual",
         provide_force_measurement: bool = False,
+        action_cost: float | None = None,
+        direct_torque_cost: float | None = None,
     ):
         super().__init__()
         if action_mode not in {"residual", "feedforward_residual", "direct"}:
@@ -47,6 +49,14 @@ class WheelLegRobotEnv(gym.Env):
         self.safety = safety
         self.action_mode = action_mode
         self.provide_force_measurement = provide_force_measurement
+        self.action_cost = (
+            float(action_cost)
+            if action_cost is not None
+            else (0.03 if action_mode != "direct" else 0.008)
+        )
+        self.direct_torque_cost = (
+            float(direct_torque_cost) if direct_torque_cost is not None else 0.004
+        )
         self.scenarios = scenarios or default_scenarios()
         self.scenario_sampler = scenario_sampler
         self.rng = np.random.default_rng(seed)
@@ -138,12 +148,11 @@ class WheelLegRobotEnv(gym.Env):
         reward += 1.2 * np.exp(-0.7 * v_err * v_err)
         reward -= 35.0 * float(y_err * y_err)
         reward -= 3.0 * float(theta * theta)
-        action_cost = 0.03 if self.action_mode != "direct" else 0.008
-        reward -= action_cost * float(np.sum(action * action))
+        reward -= self.action_cost * float(np.sum(action * action))
         reward -= 0.001 * float(np.sum(acc * acc))
         if self.action_mode == "direct":
             tau_ratio = tau / np.maximum(self.params.tau_limits, 1.0)
-            reward -= 0.004 * float(np.sum(tau_ratio * tau_ratio))
+            reward -= self.direct_torque_cost * float(np.sum(tau_ratio * tau_ratio))
         if np.any(np.abs(action) > 0.98):
             reward -= 0.5
         if failed:

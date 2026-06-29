@@ -1,0 +1,11 @@
+controller,scenario,success,rmse_h,max_abs_h,rmse_theta_deg,max_abs_theta_deg,rmse_v,sat_ratio,failure_reason,qp_success_ratio,qp_solver_success_ratio,qp_fallback_ratio,mean_qp_iterations,mean_qp_solve_time_ms,max_qp_solve_time_ms,max_qp_primal_residual,max_qp_dual_residual,max_qp_eq_residual,max_qp_ineq_violation,max_qp_friction_ratio,max_qp_leg_slack,max_qp_height_slack
+lqr,H0_static_impulse_push,1,0.00163878,0.00620916,0.0244075,0.0766604,0.0372321,0,none,,,,,,,,,,,,,
+wbc_qp,H0_static_impulse_push,1,1.06758e-07,1.08997e-07,2.80786e-06,2.8736e-06,0.0226929,0,none,1,1,0,76.03,0.025833,0.058458,1.0458e-13,6.96299e-11,1.13687e-13,0,0.107821,0,0
+rl_ppo,H0_static_impulse_push,1,0.000374015,0.000434747,0.0861246,0.0879049,0.0489906,0,none,,,,,,,,,,,,,
+rl_ppo_feedforward,H0_static_impulse_push,1,0.000748472,0.00154842,0.391109,0.433028,0.113899,0,none,,,,,,,,,,,,,
+rl_ppo_direct,H0_static_impulse_push,1,0.00454443,0.00797425,0.38136,0.53209,5.51987,0,none,,,,,,,,,,,,,
+lqr,H1_static_constant_push,1,0.0433063,0.0460967,0.872813,0.952851,0.957758,0,none,,,,,,,,,,,,,
+wbc_qp,H1_static_constant_push,1,9.21242e-08,9.37701e-08,1.66573e-06,1.83062e-06,0.157932,0,none,1,1,0,99.8439,0.0339368,0.049458,9.52791e-14,6.95979e-11,1.13687e-13,0,0.262498,0,0
+rl_ppo,H1_static_constant_push,1,0.00183561,0.0019317,0.0705683,0.0757002,0.685076,0,none,,,,,,,,,,,,,
+rl_ppo_feedforward,H1_static_constant_push,1,0.0167216,0.0220304,4.5706,8.0731,5.43095,0,none,,,,,,,,,,,,,
+rl_ppo_direct,H1_static_constant_push,1,0.0467728,0.0910217,1.92196,3.85748,4.21728,0,none,,,,,,,,,,,,,
