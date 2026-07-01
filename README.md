@@ -1,29 +1,36 @@
 # 轮腿机器人姿态与运动控制对比项目
 
-本项目实现了一个轻量级二维轮腿机器人仿真平台，用于比较四类控制器：
+本项目实现了一个轻量级二维轮腿机器人仿真平台，用于比较模型控制和学习控制在速度跟踪、姿态稳定、地形扰动和水平外力下的表现。当前报告比较五种控制器：
 
 - `lqr`：基于局部线性化模型的连续时间 LQR；
 - `wbc_qp`：显式建模降阶动力学、接触力、摩擦锥、执行器限幅和预测安全约束的 WBC/QP；
 - `rl_ppo`：在稳定基线控制器上叠加动作修正量的残差 PPO；
+- `rl_ppo_feedforward`：仅保留模型前馈项的残差 PPO 消融方案；
 - `rl_ppo_direct`：直接输出三路关节力矩的 PPO。
 
 仓库中同时包含固定测试场景、随机训练场景、PPO 训练脚本、批量评估脚本、曲线绘制工具、最终实验输出和完整 LaTeX 报告。
 
 ## 1. 当前最终结果
 
-当前用于报告的统一评估结果保存在：
+当前用于报告的主比较结果保存在：
 
 ```text
-outputs/compare_four_full_wbc/
+outputs/compare_five_controlled_ppo_1500k/
 ```
 
-该目录由同一次四控制器批量评估生成，包含：
+该目录对应五种控制器、八个固定场景，共 40 条确定性评估结果。当前保留的主要文件为：
 
 ```text
-outputs/compare_four_full_wbc/
-├── metrics.csv              # 4 个控制器 x 8 个场景，共 32 行指标
-├── figures/                 # 32 张单控制器曲线图 + 8 张四控制器对比图 + 8 张 WBC/QP 诊断图
-└── logs/                    # 32 个原始 .npz 仿真日志
+outputs/compare_five_controlled_ppo_1500k/
+├── metrics.csv
+├── derived_metrics.csv
+└── figures/
+```
+
+静止抗扰补充结果保存在：
+
+```text
+outputs/static_push_controlled_ppo_1500k/
 ```
 
 八个固定测试场景下的平均结果如下。正式评估默认不把真实外力直接提供给任何控制器，控制器只能根据状态误差响应扰动：
@@ -32,10 +39,11 @@ outputs/compare_four_full_wbc/
 | --- | ---: | ---: | ---: | ---: | ---: |
 | `lqr` | `8/8` | `0.027323` | `0.390307` | `0.552078` | `0.000988` |
 | `wbc_qp` | `8/8` | `0.000380` | `0.009513` | `0.257876` | `0.019039` |
-| `rl_ppo` | `8/8` | `0.009810` | `2.497230` | `0.370462` | `0.015658` |
-| `rl_ppo_direct` | `8/8` | `0.007023` | `1.588770` | `0.081625` | `0.016958` |
+| `rl_ppo` | `8/8` | `0.010827` | `0.233023` | `0.427608` | `0.000936` |
+| `rl_ppo_feedforward` | `8/8` | `0.009161` | `2.466138` | `2.052637` | `0.020079` |
+| `rl_ppo_direct` | `8/8` | `0.004254` | `0.258774` | `6.571626` | `0.000000` |
 
-结果表明：降阶 WBC/QP 在高度和姿态控制方面显著优于基础 LQR；直接力矩 PPO 的平均速度跟踪误差最低，但在 `5 m/s` 复合边界场景中的姿态误差明显大于 WBC/QP。四个控制器在题目边界场景 `G_requirement_boundary` 和越界压力场景 `E_combined_stress` 中都完成了完整的 `8 s` 仿真。
+结果表明：降阶 WBC/QP 的高度和姿态误差最低，速度误差也最低；PD 残差 PPO 在三种 PPO 中表现相对稳定；前馈残差 PPO 和直接 PPO 都存在明显速度跟踪问题。五种控制器在题目边界场景 `G_requirement_boundary` 和越界压力场景 `E_combined_stress` 中都完成了完整的 `8 s` 仿真。
 
 详细分析见：
 
@@ -53,6 +61,7 @@ report.pdf
 ```text
 numpy
 scipy
+osqp
 matplotlib
 gymnasium
 stable-baselines3
@@ -67,50 +76,37 @@ rich
 python -m pip install -r requirements.txt
 ```
 
-当前 Windows 工作站已经配置好 GPU 环境：
-
-```text
-D:\Anaconda\envs\gpupytorch\python.exe
-```
-
-PowerShell 中可以直接使用：
-
-```powershell
-$PYTHON = "D:\Anaconda\envs\gpupytorch\python.exe"
-& $PYTHON -B -c "import numpy, scipy, gymnasium, torch, stable_baselines3; print('environment ok')"
-```
-
-当前已验证的关键版本为：
-
-```text
-numpy              1.26.4
-scipy              1.13.1
-gymnasium          1.1.1
-torch              2.5.1
-stable-baselines3  2.7.1
-```
-
-### 2.2 运行四控制器统一评估
+### 2.2 运行五控制器统一评估
 
 PowerShell：
 
 ```powershell
-$PYTHON = "D:\Anaconda\envs\gpupytorch\python.exe"
 & $PYTHON -B scripts\run_compare.py `
-  --controllers lqr wbc_qp rl_ppo rl_ppo_direct `
-  --residual-model-path outputs\models\ppo_wheel_leg_residual_random `
-  --direct-model-path outputs\models\ppo_wheel_leg_direct `
-  --out-dir outputs\compare_four_full_wbc
+  --controllers lqr wbc_qp rl_ppo rl_ppo_feedforward rl_ppo_direct `
+  --residual-model-path outputs\models\ppo_wheel_leg_residual_random_1500k_n8_seed0_controlled `
+  --feedforward-model-path outputs\models\ppo_wheel_leg_feedforward_residual_random_1500k_n8_seed0_controlled `
+  --direct-model-path outputs\models\ppo_wheel_leg_direct_random_1500k_n8_seed0_controlled `
+  --out-dir outputs\compare_five_controlled_ppo_1500k
 ```
 
 Linux、macOS 或已经激活虚拟环境的终端：
 
 ```bash
 python -B scripts/run_compare.py \
-  --controllers lqr wbc_qp rl_ppo rl_ppo_direct \
-  --residual-model-path outputs/models/ppo_wheel_leg_residual_random \
-  --direct-model-path outputs/models/ppo_wheel_leg_direct \
-  --out-dir outputs/compare_four_full_wbc
+  --controllers lqr wbc_qp rl_ppo rl_ppo_feedforward rl_ppo_direct \
+  --residual-model-path outputs/models/ppo_wheel_leg_residual_random_1500k_n8_seed0_controlled \
+  --feedforward-model-path outputs/models/ppo_wheel_leg_feedforward_residual_random_1500k_n8_seed0_controlled \
+  --direct-model-path outputs/models/ppo_wheel_leg_direct_random_1500k_n8_seed0_controlled \
+  --out-dir outputs/compare_five_controlled_ppo_1500k
+```
+
+若需要重新生成稳态速度 RMSE、分通道饱和比例、平顺性和控制量代理指标，继续运行：
+
+```bash
+python -B scripts/build_derived_metrics.py \
+  --metrics-csv outputs/compare_five_controlled_ppo_1500k/metrics.csv \
+  --logs-dir outputs/compare_five_controlled_ppo_1500k/logs \
+  --out-csv outputs/compare_five_controlled_ppo_1500k/derived_metrics.csv
 ```
 
 ### 2.3 只运行模型控制器
@@ -211,7 +207,7 @@ curvature(x)
 
 ### 3.5 外力测量与公平评估
 
-场景中的水平外力始终进入前向动力学，但正式评估默认不把真实外力值直接暴露给控制器。这使 LQR、WBC/QP 和两种 PPO 都在相同的盲扰动条件下比较。若要模拟已安装外力传感器或外力估计器，可显式启用：
+场景中的水平外力始终进入前向动力学，但正式评估默认不把真实外力值直接暴露给控制器。这使 LQR、WBC/QP 和三种 PPO 都在相同的盲扰动条件下比较。若要模拟已安装外力传感器或外力估计器，可显式启用：
 
 ```bash
 python -B scripts/run_compare.py \
@@ -385,10 +381,26 @@ tau = stabilizing_baseline_tau + action * rl_residual_scale
 最终评估使用的模型为：
 
 ```text
-outputs/models/ppo_wheel_leg_residual_random.zip
+outputs/models/ppo_wheel_leg_residual_random_1500k_n8_seed0_controlled.zip
 ```
 
-### 5.4 直接力矩 PPO
+### 5.4 前馈残差 PPO
+
+前馈残差 PPO 使用同一个 PPO 动作空间，但基准项不再是带 PD 反馈的稳定控制器，而是由地形坡度、目标速度、腿长和重力项计算出的模型前馈力矩：
+
+```text
+tau = model_feedforward_tau + action * rl_residual_scale
+```
+
+该控制器用于观察只给模型前馈，再让 PPO 修正余量的效果。它保留了对动力学项的显式计算，但反馈稳定性弱于 PD 残差 PPO，因此在当前结果中速度误差和姿态误差更明显。
+
+最终评估使用的模型为：
+
+```text
+outputs/models/ppo_wheel_leg_feedforward_residual_random_1500k_n8_seed0_controlled.zip
+```
+
+### 5.5 直接力矩 PPO
 
 直接 PPO 同样输出三维归一化动作，但动作会直接映射为力矩：
 
@@ -398,17 +410,17 @@ tau_knee  = 0.5 * (action[1] + 1) * 160
 tau_hip   = action[2] * 120
 ```
 
-膝关节是主要伸腿执行器，因此映射到 `[0, 160] N*m`；轮和髋关节仍采用对称范围。由于策略需要同时学会支撑身体、保持姿态和跟踪速度，训练难度高于残差 PPO，适合使用分阶段课程训练。
+膝关节是主要伸腿执行器，因此映射到 `[0, 160] N*m`；轮和髋关节仍采用对称范围。由于策略需要同时学会支撑身体、保持姿态和跟踪速度，训练难度高于残差 PPO，在当前版本中主要作为端到端力矩策略的对照。
 
 最终评估使用的模型为：
 
 ```text
-outputs/models/ppo_wheel_leg_direct.zip
+outputs/models/ppo_wheel_leg_direct_random_1500k_n8_seed0_controlled.zip
 ```
 
-### 5.5 PPO 模型加载兼容
+### 5.6 PPO 模型加载兼容
 
-`src/controllers/rl_policy.py` 在加载已有模型时会显式传入固定的观测空间和动作空间，并兼容 NumPy 1.x 与 NumPy 2.x 的私有模块路径差异。这样可以在当前 `numpy 1.26.4` 环境中读取较新环境保存的 PPO 模型，无需为了反序列化升级整个科学计算环境。
+`src/controllers/rl_policy.py` 在加载已有模型时会显式传入固定的观测空间和动作空间，并兼容 NumPy 1.x 与 NumPy 2.x 的私有模块路径差异。这样可以在 NumPy 1.x 环境中读取较新环境保存的 PPO 模型，无需为了反序列化升级整个科学计算环境。
 
 ## 6. RL 环境与训练
 
@@ -457,60 +469,38 @@ PPO 的观测向量为：
 
 固定评估场景与随机训练场景相互分离，避免直接在测试集上训练。
 
-### 6.4 训练残差 PPO
+### 6.4 PPO 训练命令
+
+三种 PPO 使用相同训练分布、训练步数、并行环境数、随机种子、学习率、熵系数和动作惩罚。
+
+残差 PPO：
 
 ```bash
-python scripts/train_rl.py \
-  --action-mode residual \
-  --scenario-set random_full \
-  --timesteps 300000 \
-  --n-envs 4 \
-  --save-path outputs/models/ppo_wheel_leg_residual_random
+python -B scripts/train_rl.py --action-mode residual \
+  --scenario-set random_full --timesteps 1500000 --n-envs 8 \
+  --seed 0 --device cpu --learning-rate 0.0002 --ent-coef 0.003 \
+  --action-cost 0.03 --direct-torque-cost 0.0 \
+  --save-path outputs/models/ppo_wheel_leg_residual_random_1500k_n8_seed0_controlled
 ```
 
-单独评估残差 PPO：
+前馈残差 PPO：
 
 ```bash
-python scripts/eval_rl.py \
-  --model-path outputs/models/ppo_wheel_leg_residual_random \
-  --out-dir outputs/eval_rl
+python -B scripts/train_rl.py --action-mode feedforward_residual \
+  --scenario-set random_full --timesteps 1500000 --n-envs 8 \
+  --seed 0 --device cpu --learning-rate 0.0002 --ent-coef 0.003 \
+  --action-cost 0.03 --direct-torque-cost 0.0 \
+  --save-path outputs/models/ppo_wheel_leg_feedforward_residual_random_1500k_n8_seed0_controlled
 ```
 
-### 6.5 分阶段训练直接 PPO
-
-阶段 1：在简单平地任务上学习支撑和基础移动。
+直接力矩 PPO：
 
 ```bash
-python scripts/train_rl.py \
-  --action-mode direct \
-  --scenario-set random_easy \
-  --timesteps 1000000 \
-  --n-envs 8 \
-  --save-path outputs/models/ppo_wheel_leg_direct_stage1
-```
-
-阶段 2：加入随机外力。
-
-```bash
-python scripts/train_rl.py \
-  --action-mode direct \
-  --scenario-set random_force \
-  --load-path outputs/models/ppo_wheel_leg_direct_stage1 \
-  --timesteps 1000000 \
-  --n-envs 8 \
-  --save-path outputs/models/ppo_wheel_leg_direct_stage2
-```
-
-阶段 3：加入随机地形和随机外力。
-
-```bash
-python scripts/train_rl.py \
-  --action-mode direct \
-  --scenario-set random_full \
-  --load-path outputs/models/ppo_wheel_leg_direct_stage2 \
-  --timesteps 1500000 \
-  --n-envs 8 \
-  --save-path outputs/models/ppo_wheel_leg_direct
+python -B scripts/train_rl.py --action-mode direct \
+  --scenario-set random_full --timesteps 1500000 --n-envs 8 \
+  --seed 0 --device cpu --learning-rate 0.0002 --ent-coef 0.003 \
+  --action-cost 0.03 --direct-torque-cost 0.0 \
+  --save-path outputs/models/ppo_wheel_leg_direct_random_1500k_n8_seed0_controlled
 ```
 
 ## 7. 输出文件说明
@@ -521,6 +511,7 @@ python scripts/train_rl.py \
 
 ```text
 outputs/<run_name>/metrics.csv
+outputs/<run_name>/derived_metrics.csv
 ```
 
 通用指标包括：
@@ -536,7 +527,7 @@ rmse_v
 sat_ratio
 ```
 
-内部计算还包含运行时长、jerk、能量和平均力矩范数。WBC/QP 额外输出 QP 可行解比例、OSQP 求解成功比例、回退比例、平均迭代次数、平均/最大求解耗时、最大原始/对偶残差、最大约束残差、最大摩擦利用率和最大安全松弛量。
+`metrics.csv` 保存每个控制器、每个场景的基础结果；`derived_metrics.csv` 由日志文件进一步汇总稳态速度误差、分通道饱和比例、平顺性和控制量代理指标。WBC/QP 额外输出 QP 可行解比例、OSQP 求解成功比例、回退比例、平均迭代次数、平均/最大求解耗时、最大原始/对偶残差、最大约束残差、最大摩擦利用率和最大安全松弛量。
 
 ### 7.2 日志文件
 
@@ -591,37 +582,27 @@ latexmk -xelatex -interaction=nonstopmode -halt-on-error report.tex
 报告当前引用：
 
 ```text
-outputs/compare_four_full_wbc/figures/
+outputs/compare_five_controlled_ppo_1500k/figures/
 ```
 
-因此不要删除 `outputs/compare_four_full_wbc/`，除非随后重新运行四控制器统一评估。
 
-## 9. 回归测试
-
-运行核心逻辑测试：
-
-```bash
-python -B -m unittest discover -s tests -v
-```
-
-测试覆盖质心外力语义、WBC 仿射等式与前向动力学一致性、随机地形曲率平滑性、准确仿真时域、失败状态日志、外力测量开关和题目边界场景。
-
-## 10. 项目结构
+## 9. 项目结构
 
 ```text
 RoBoT-of-two-beauty/
 ├── .gitignore
-├── README_CODE.md
+├── README.md
+├── .latexmkrc
 ├── requirements.txt
 ├── report.tex
 ├── report.pdf
+├── robot.png
 ├── 题目.pdf
 ├── scripts/
 │   ├── run_compare.py          # 固定场景批量评估入口
 │   ├── train_rl.py             # PPO 训练入口
-│   └── eval_rl.py              # 残差 PPO 单独评估入口
-├── tests/
-│   └── test_core_logic.py       # 动力学、仿真循环和场景回归测试
+│   ├── eval_rl.py              # 残差 PPO 单独评估入口
+│   └── build_derived_metrics.py # 从日志生成补充指标
 ├── src/
 │   ├── config/
 │   │   ├── params.py           # 机器人、仿真和安全参数
@@ -643,53 +624,16 @@ RoBoT-of-two-beauty/
 │   │   └── logger.py           # 日志收集与 .npz 保存
 │   └── evaluation/
 │       ├── metrics.py          # 指标计算和 CSV 输出
-│       └── plots.py            # 常规曲线、四控制器对比图与 WBC/QP 诊断图
+│       └── plots.py            # 常规曲线、多控制器对比图与 WBC/QP 诊断图
 └── outputs/
     ├── models/                 # PPO 模型
-    └── compare_four_full_wbc/  # 报告使用的最终统一评估结果
+    ├── compare_five_controlled_ppo_1500k/  # 报告使用的五控制器主结果
+    └── static_push_controlled_ppo_1500k/   # 静止抗扰补充结果
 ```
 
 各级 `__init__.py` 用于将目录声明为 Python 包。
 
-## 11. 可删除的临时文件
 
-以下文件均可重新生成，不影响源码：
-
-```text
-.DS_Store
-report.aux
-report.fdb_latexmk
-report.fls
-report.log
-report.out
-report.synctex.gz
-report.synctex(busy)
-report.toc
-report.xdv
-pdflatex*.fls
-xelatex*.fls
-outputs/.mplconfig/
-outputs/_review*/
-outputs/models/_review*.zip
-src/**/__pycache__/
-scripts/**/__pycache__/
-```
-
-删除报告临时文件前，建议先关闭编辑器中的 PDF 预览，以免 `report.synctex.gz` 仍被占用。
-
-以下目录和文件应当保留：
-
-```text
-outputs/models/
-outputs/compare_four_full_wbc/
-report.tex
-report.pdf
-src/
-scripts/
-requirements.txt
-题目.pdf
-```
-
-## 12. 实现边界
+## 10. 实现边界
 
 本项目面向课程报告和控制方法对比，采用二维降阶模型，而不是完整多刚体动力学引擎。当前 WBC/QP 已显式描述任务加速度、接触力、摩擦锥、执行器映射、力矩限制和预测安全约束，并使用 OSQP 专用 QP 求解器求解标准凸 QP；但它仍属于与现有降阶仿真匹配的 WBC/QP。若进一步面向高频实时控制，可以引入显式关节坐标、刚体质量矩阵、接触雅可比，并复用 QP 工作区以降低在线求解开销。

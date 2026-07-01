@@ -18,13 +18,33 @@
 \usepackage{microtype}
 \usepackage{url}
 
-\setCJKmainfont{Songti SC}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
-\setCJKsansfont{PingFang SC}[AutoFakeBold=2.5]
-\setCJKmonofont{Songti SC}
-\setCJKfamilyfont{zhsong}{Songti SC}[AutoFakeBold=2.5]
-\setCJKfamilyfont{zhhei}{PingFang SC}[AutoFakeBold=2.5]
-\setCJKfamilyfont{zhkai}{Songti SC}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
-\setCJKfamilyfont{zhfs}{Songti SC}[AutoFakeBold=2.5]
+\IfFontExistsTF{Songti SC}{
+  \setCJKmainfont{Songti SC}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+  \setCJKsansfont{PingFang SC}[AutoFakeBold=2.5]
+  \setCJKmonofont{Songti SC}
+  \setCJKfamilyfont{zhsong}{Songti SC}[AutoFakeBold=2.5]
+  \setCJKfamilyfont{zhhei}{PingFang SC}[AutoFakeBold=2.5]
+  \setCJKfamilyfont{zhkai}{Songti SC}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+  \setCJKfamilyfont{zhfs}{Songti SC}[AutoFakeBold=2.5]
+}{
+  \IfFontExistsTF{SimSun}{
+    \setCJKmainfont{SimSun}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+    \setCJKsansfont{SimHei}[AutoFakeBold=2.5]
+    \setCJKmonofont{SimSun}
+    \setCJKfamilyfont{zhsong}{SimSun}[AutoFakeBold=2.5]
+    \setCJKfamilyfont{zhhei}{SimHei}[AutoFakeBold=2.5]
+    \setCJKfamilyfont{zhkai}{KaiTi}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+    \setCJKfamilyfont{zhfs}{FangSong}[AutoFakeBold=2.5]
+  }{
+    \setCJKmainfont{FandolSong-Regular}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+    \setCJKsansfont{FandolHei-Regular}[AutoFakeBold=2.5]
+    \setCJKmonofont{FandolSong-Regular}
+    \setCJKfamilyfont{zhsong}{FandolSong-Regular}[AutoFakeBold=2.5]
+    \setCJKfamilyfont{zhhei}{FandolHei-Regular}[AutoFakeBold=2.5]
+    \setCJKfamilyfont{zhkai}{FandolKai-Regular}[AutoFakeBold=2.5,AutoFakeSlant=0.18]
+    \setCJKfamilyfont{zhfs}{FandolFang-Regular}[AutoFakeBold=2.5]
+  }
+}
 
 \geometry{left=2.35cm,right=2.35cm,top=2.35cm,bottom=2.45cm,headheight=15pt}
 \setlength{\parindent}{2em}
@@ -135,13 +155,12 @@
 LQR、带显式动力学与约束的降阶 WBC/QP、基于 PD 稳定器的残差 PPO、仅保留模型前馈项的
 残差 PPO 消融方案，以及直接输出三路力矩的 PPO。实验包含八个主固定场景，每种实现各运行
 一次，共得到 40 条确定性轨迹。评价指标包括安全终止状态、高度与姿态误差、速度误差、
-稳态速度误差、力矩饱和比例以及平顺性和控制量代理指标。因此，本文的“鲁棒性”含义限定为
-固定扰动场景下的初步对比和有效性边界讨论，而非多随机种子 Monte Carlo 意义上的统计鲁棒性证明。
+稳态速度误差、力矩饱和比例以及平顺性和控制量代理指标。
 
 统一评估结果显示：五种实现均未触发报告设定的安全终止阈值。降阶 WBC/QP 的八场景平均高度 RMSE 为
 \SI{3.8e-4}{m}，平均姿态 RMSE 为 \SI{0.0095}{\degree}，平均速度 RMSE 为
 \SI{0.258}{m/s}，在平台稳定性和综合速度指标上表现最稳。PD 残差 PPO 在相同
-$1.5\times10^6$ 步训练协议下的平均姿态 RMSE 为 \SI{0.233}{\degree}，平均速度 RMSE 为
+$1.5\times10^6$ 步条件下的平均姿态 RMSE 为 \SI{0.233}{\degree}，平均速度 RMSE 为
 \SI{0.428}{m/s}；前馈残差消融方案平均速度 RMSE 为 \SI{2.053}{m/s}，说明去掉基础反馈后速度性能明显下降。
 直接力矩 PPO 在同一训练预算、学习率、熵系数和动作惩罚下保持了较小高度与姿态误差，但平均速度 RMSE 达到
 \SI{6.572}{m/s}，表明直接力矩动作空间本身并不天然带来更好的速度跟踪。
@@ -188,8 +207,8 @@ $[\tau_{\rm wheel},\tau_{\rm knee},\tau_{\rm hip}]^{\mathsf T}$；动力学模�
 仿真步长、执行器限幅、安全判据和测试场景。实现层面的观测信息为：LQR 使用状态和速度指令，WBC/QP
 使用当前地形并在预测约束中查询短时前方地形，PPO 使用由状态和局部地形高度、坡度组成的观测向量。
 
-需要强调的是，本文研究对象是题目参数驱动的二维降阶轮腿模型，而不是含真实髋膝关节角、轮速、连杆质量、
-转动惯量和接触切换的完整多刚体机器人模型。报告中的控制器优劣结论只针对该降阶模型、参数、限幅和场景成立。
+本文只讨论题目参数对应的二维降阶轮腿模型；模型中没有真实髋膝关节角、轮速、连杆质量、
+转动惯量和接触切换。因此，控制器比较只适用于本文模型、参数、限幅和测试场景。
 
 \subsection{参数设定}
 表~\ref{tab:params} 汇总代码中使用的主要机器人参数、仿真参数和控制器动作尺度。
@@ -247,15 +266,13 @@ $[\tau_{\rm wheel},\tau_{\rm knee},\tau_{\rm hip}]^{\mathsf T}$；动力学模�
 地形对象统一提供高度 $h(x)$、坡度 $h'(x)$ 和曲率 $h''(x)$。平地直接给出零高度和零坡度；正弦地形采用
 解析导数；多频地形把多个正弦分量叠加后按最大高度缩放；随机地形先采样高斯高度，再用卷积平滑和三次样条
 生成连续高度、坡度和曲率。
-该状态没有显式关节角、轮速、连杆姿态和接触模式，因此更接近带轮式水平驱动的竖直伸缩腿模型；
-大腿和小腿长度主要用于腿长可达性和观测量构造。
 
 \subsection{轮腿几何与可达性}
 轮心高度由地形高度和轮半径给出：
 \begin{equation}
 y_{\rm wheel}=h(x)+r.
 \end{equation}
-代码把两段腿的支撑效果写成竖直伸缩腿，腿长和腿长变化率为
+模型将两段腿等效为竖直伸缩腿，腿长和腿长变化率为
 \begin{align}
 l&=y-y_{\rm wheel}=y-h(x)-r,\\
 \dot l&=v_y-h'(x)v_x .
@@ -294,9 +311,8 @@ F_{\rm drive,cmd}=\frac{\tau_{\rm wheel}}{r}.
 F_n&=\max(F_{\rm leg},0),\\
 F_t&=\operatorname{clip}\!\left(F_{\rm drive,cmd},-\mu\max(F_n,1),\mu\max(F_n,1)\right)
 \end{align}
-计算。这里的切向力限幅对应二维库仑摩擦约束，$\max(F_n,1)$ 用于法向力很小时的数值保护；它不是物理离地接触模型，
-只避免数值积分在 $F_n\approx0$ 时出现零摩擦边界奇异。正式评估轨迹中腿长和法向力均未进入长期离地状态，因此该保护
-主要影响极端瞬态附近的数值稳定性。
+计算。切向力按二维库仑摩擦限幅，$\max(F_n,1)$ 只是在法向力很小时避免摩擦边界退化，
+该项不表示离地后的接触。而实际上，正式评估轨迹中腿长和法向力均未进入长期离地状态，因此它主要影响少数瞬态点的积分稳定。
 
 \subsection{前向动力学与积分}
 动力学模块把轮地切向力、腿部支撑力、阻尼、坡度阻力和外力合成为三个加速度：
@@ -313,9 +329,8 @@ d_t=\gamma\max(y-h(x),0.1).
 \begin{equation}
 \dot{\bm x}=[v_x,\ v_y,\ \omega,\ \ddot x,\ \ddot y,\ \ddot\theta]^{\mathsf T}.
 \end{equation}
-上式采用小坡度等效处理：$F_n$ 和 $F_t$ 保留接触力解释，但在动力学中分别作为竖直支撑力和水平驱动力使用；
-坡度影响主要通过 $mgh'(x)$ 和腿长变化率进入。对于高坡度、大曲率或离地碰撞工况，该近似需要由地形坐标系力分解
-和多刚体接触模型替代。
+这里对坡度作简化处理：$F_n$ 作为竖直支撑力，$F_t$ 作为水平驱动力，地形坡度主要通过 $mgh'(x)$ 和腿长变化率影响动力学。若地形坡度或曲率较大，或出现离地碰撞，需要改用地形坐标系下的力分解
+和更完整的接触模型。
 单步推进使用四阶 Runge--Kutta：
 \begin{align}
 \bm k_1&=f(\bm x_k,\bm\tau_k),\\
@@ -336,8 +351,8 @@ d_t=\gamma\max(y-h(x),0.1).
   \item 腿长超出 $r\le l\le L_1+L_2$，记为 \code{leg_infeasible}；
   \item $l<\SI{0.18}{m}$，记为 \code{leg_collapsed}。
 \end{enumerate}
-若触发任一条件，仿真记录失败原因；默认评估在首次失败后停止。
-因此，表格中的“未终止”仅表示未触发上述粗粒度失败条件，并不等同于真实系统安全。当前判据尚未包含速度发散、
+若触发任一条件，仿真记录失败原因，评估在首次失败后停止。
+因此，表格中的“未终止”只表示上述条件没有触发，不能直接等同于真实系统安全。当前判据尚未包含速度发散、
 长期力矩饱和、能耗过高、接触力异常或超出任务速度范围等更细的安全约束。
 
 \section{评价指标}
@@ -363,7 +378,7 @@ e_{h,\max}&=\max_k|y_k-y_{{\rm ref},k}|,\\
 \theta_{\max}&=\max_k|\theta_k|,\\
 \mathrm{RMSE}_v&=\sqrt{\frac{1}{N}\sum_{k=1}^{N}(v_{x,k}-v_{{\rm cmd},k})^2}.
 \end{align}
-由于速度指令由零平滑上升到目标值，全时域速度 RMSE 会混入启动过程。作为稳态评价，本文还统计
+由于速度指令由零平滑上升到目标值，全时域速度 RMSE 会把启动段也算进去。作为稳态评价，本文还统计
 $t\ge\SI{2}{s}$ 后的速度误差：
 \begin{equation}
 \mathrm{RMSE}_{v,\rm ss}=
@@ -411,7 +426,7 @@ LQR 是经典线性二次型最优控制方法\cite{Kalman1960OptimalControl,And
 J=\int_0^\infty
 \left(\Delta\bm x^{\mathsf T}Q\Delta\bm x+\Delta\bm\tau^{\mathsf T}R\Delta\bm\tau\right)\mathrm dt .
 \end{equation}
-该方法控制律为线性状态反馈，结构清晰、在线计算量小，适合用作局部稳定控制基线；其控制性能由线性化工作点和
+该方法控制律为线性状态反馈，结构清晰、在线计算量小，适合用作局部稳定控制基线。其控制性能由线性化工作点和
 权重矩阵共同决定。
 
 \subsection{方法实现}
@@ -423,7 +438,7 @@ LQR 控制器在平地、无外力条件下按当前速度指令 $v_{\rm cmd}$ �
 \begin{equation}
 \tau_{{\rm wheel},0}=c_xv_{\rm cmd}r,
 \end{equation}
-对应名义切向力 $F_{t,0}=c_xv_{\rm cmd}$。膝、髋力矩由主动支撑力和俯仰力矩两个方程确定：
+切向力参考值用来抵消水平阻尼项，这里取 $F_{t,0}=c_xv_{\rm cmd}$。膝、髋力矩由主动支撑力和俯仰力矩两个方程确定：
 \begin{equation}
 \begin{bmatrix}
 1 & 0.6\\
@@ -529,7 +544,7 @@ I\alpha-d_tF_t-0.15\tau_{\rm knee}-\tau_{\rm hip}
 F_{\rm leg,pass}=k_l(l_0-l)-c_l\dot l.
 \end{equation}
 其中 $\hat F_{\rm ext}$ 表示控制器可用的水平外力估计量。正式评估默认不启用外力测量开关，
-因此控制器使用 $\hat F_{\rm ext}=0$；真实外力仍进入前向动力学。
+因此控制器使用 $\hat F_{\rm ext}=0$，真实外力仍进入前向动力学。
 
 \subsection{不等式约束与预测边界}
 硬约束包括法向预载、摩擦锥、力矩边界和松弛变量非负：
@@ -607,7 +622,7 @@ w_y=6\times10^5.
 \subsection{方法特点}
 PPO 是基于策略梯度的强化学习算法，通过限制新旧策略概率比的变化幅度提高训练稳定性
 \cite{Schulman2017PPO}。在控制问题中，PPO 直接学习从观测 $\bm o$ 到动作 $\bm u$ 的非线性映射，
-适合表示难以手工线性化的反馈律；训练完成后，在线控制只需一次神经网络前向推理。本文通过 Gymnasium 环境接口
+适合表示难以手工线性化的反馈律。训练完成后，在线控制只需一次神经网络前向推理。本文通过 Gymnasium 环境接口
 和 Stable-Baselines3 完成训练与模型加载\cite{Towers2024Gymnasium,Raffin2021SB3}。
 
 \subsection{环境观测与奖励}
@@ -689,7 +704,7 @@ PPO 输出按残差尺度 $\bm s_{\rm res}=[5,25,25]^{\mathsf T}$ 叠加：
 \end{equation}
 
 \subsection{前馈残差 PPO}
-前馈残差模式使用地形模型计算名义前馈力矩，再由 PPO 输出残差。代码首先计算
+前馈残差 PPO 先根据地形估计一组基础力矩，再由 PPO 在此基础上补充修正量。代码首先计算
 \begin{align}
 l_{\rm nom}&=y_{\rm ref}-h(x)-r,\\
 \dot l_{\rm nom}&=-h'(x)v_{\rm cmd},\\
@@ -704,7 +719,7 @@ F_{\rm pass}^\star=k_l(l_0-l_{\rm nom})-c_l\dot l_{\rm nom},
 \begin{equation}
 F_{\rm act}^\star=F_n^\star-F_{\rm pass}^\star.
 \end{equation}
-名义轮毂力矩和膝髋力矩由
+轮毂、膝关节和髋关节的基础力矩由
 \begin{align}
 \tau_{\rm wheel}^\star&=rF_t^\star,\\
 \begin{bmatrix}
@@ -735,8 +750,8 @@ dF_{\rm act}^\star\\
 \tau_{\rm hip}&=u_3\tau_{{\rm hip},\max}=120u_3.
 \end{align}
 膝关节通道映射到 $[0,160]$ \si{N.m}，轮毂和髋关节通道映射到对称区间。三路力矩随后仍经过统一限幅函数。
-该设计把膝关节视为主要伸腿支撑执行器，给直接 PPO 引入了不同于 LQR、WBC/QP 和残差 PPO 的动作先验；
-因此本文把直接 PPO 结果解释为当前动作空间设计下的经验表现，而不把它视为与其它控制律完全等价的公平算法比较。
+这样把膝关节视为主要伸腿支撑执行器，给直接 PPO 引入了不同于 LQR、WBC/QP 和残差 PPO 的动作先验。
+因此，直接 PPO 的结果只说明这套动作空间下的表现，不用于证明它和其他控制器在算法层面孰优孰劣。
 
 \subsection{训练配置}
 训练脚本使用 Stable-Baselines3 的 PPO。本文用于主比较的三种 PPO 均采用同一受控训练协议：
@@ -752,8 +767,8 @@ n_{\rm steps}=1024,\quad
 \end{equation}
 其中 $\lambda_{\rm GAE}$ 为广义优势估计参数，$\epsilon_{\rm clip}$ 为 PPO 概率比裁剪范围。
 固定场景评估时，控制器通过 \code{model.predict(obs, deterministic=True)} 调用训练好的策略。
-上述设置使 PPO 主比较中的训练预算和主要优化超参数保持一致；剩余差异主要来自动作映射、基础控制器结构以及动作到物理力矩的尺度。
-若要进一步形成统计结论，还需要至少 3--5 个随机种子。
+上述设置使 PPO 主比较中的训练预算和主要优化超参数保持一致，剩余差异主要来自动作映射、基础控制器结构以及动作到物理力矩的尺度。
+
 
 \section{固定场景与数据来源}
 
@@ -782,9 +797,9 @@ G：边界组合 & \SI{5}{m/s} & 持续 \SI{100}{N} & 振幅 \SI{0.05}{m}、波�
 \end{tabularx}
 \end{table}
 
-表中速度为稳态目标值；当前代码通过 \code{smooth_speed} 在约 \SI{1}{s}
-内从零平滑上升到目标速度，因此速度 RMSE 包含启动过程。
-其中 C2 只使用固定随机种子 7，不能代表随机地形统计分布；它应理解为一个平滑随机地形样例。
+表中速度为稳态目标值；代码通过 \code{smooth_speed} 在约 \SI{1}{s}
+内把速度指令从零提高到目标值，因此速度 RMSE 包含启动段。
+
 
 \subsection{数据来源与图表说明}
 主比较采用目录 \path{outputs/compare_five_controlled_ppo_1500k} 中的结果：五种实现、八个场景，共 40 条轨迹。
@@ -793,9 +808,7 @@ G：边界组合 & \SI{5}{m/s} & 持续 \SI{100}{N} & 振幅 \SI{0.05}{m}、波�
 \path{outputs/static_push_controlled_ppo_1500k} 中的数据。
 
 PPO 训练使用 \code{random_full} 采样器时，速度范围为 \SI{0}{m/s}--\SI{5}{m/s}，地形在平地、正弦、多频和噪声地形中随机，
-外力在无扰动、脉冲和恒定扰动中随机，幅值大体限制在题目范围内。本文只采用单随机种子模型，
-未用多模型统计均值和标准差；因此固定测试结果不能声称为严格泛化性能证明。
-
+外力在无扰动、脉冲和恒定扰动中随机，幅值限制在题目范围内。
 \section{总体结果与有效性分析}
 
 \subsection{八场景汇总}
@@ -825,8 +838,8 @@ PD 残差 PPO & $8/8$ & 0.0108 & 0.233 & 0.428 & 0.263 & 0.001 & 13.16 & 1.565 \
 
 表~\ref{tab:aggregate} 汇总了八个主固定场景的平均指标。五种实现均未触发安全终止阈值，但任务指标差异较大。
 WBC/QP 的平均高度 RMSE 为 \SI{0.00038}{m}，平均姿态 RMSE 为 \SI{0.0095}{\degree}，主要反映其在目标函数中
-对平台高度和躯干姿态赋予了较高权重，并且与前向仿真共享降阶模型和地形信息。在同一受控训练协议下，
-PD 残差 PPO 的平均速度 RMSE 为 \SI{0.428}{m/s}，姿态 RMSE 为 \SI{0.233}{\degree}；
+对平台高度和躯干姿态赋予了较高权重，并且与前向仿真共享降阶模型和地形信息。在同一训练条件下，
+PD 残差 PPO 的平均速度 RMSE 为 \SI{0.428}{m/s}，姿态 RMSE 为 \SI{0.233}{\degree}，
 前馈残差 PPO 的平均速度 RMSE 为 \SI{2.053}{m/s}，表明仅依靠当前前馈残差策略难以在全部场景中维持速度跟踪。
 直接 PPO 的高度和姿态误差不大，但平均速度 RMSE 达到 \SI{6.572}{m/s}，说明直接力矩输出在当前奖励和动作尺度下
 没有学到有效速度跟踪。
@@ -849,8 +862,8 @@ PD 残差 PPO & 0.428 & 0.427 & E 场景影响较小 \\
 \end{tabularx}
 \end{table}
 
-场景 E 的峰值外力为 \SI{160}{N}，超出题目给定的 \SI{100}{N} 上限，因此表~\ref{tab:req-vs-stress}
-把题目范围内七场景和包含 E 的八主场景分开列出。两种平均方式不改变主要排序，但报告后文把 E 仅作为超规格压力测试解释。
+表~\ref{tab:req-vs-stress} 将包含 E 场景的八场景平均值和去掉 E 场景后的七场景平均值分开列出。可以看到，LQR 和 PD 残差 PPO 的两组速度 RMSE 基本一致，说明超规格 E 场景对它们的平均速度指标影响不大。WBC/QP 在包含 E 场景时平均速度 RMSE 反而略低，说明 E 场景并不是其速度误差的主要来源。前馈残差 PPO 在去掉 E 场景后速度 RMSE 从 2.053 降到 1.938，说明 E 场景会进一步放大其速度偏差，但即使只看题目范围内的七个场景，其速度误差仍然明显偏大。直接 PPO 的七场景速度 RMSE 反而高于八场景平均值，说明它的主要问题并不是由超规格 E 场景造成的，而是整体速度跟踪能力不足。
+
 
 \begin{table}[htbp]
 \centering
@@ -869,17 +882,17 @@ PD 残差 PPO & 0 & 0.0028 & 0 \\
 \bottomrule
 \end{tabular}
 \end{table}
+表~\ref{tab:sat-channel} 进一步给出了三路力矩的分通道饱和比例。整体来看，饱和主要集中在膝关节通道，髋关节通道在这组实验中几乎没有触及限幅。WBC/QP 和前馈残差 PPO 的膝关节饱和比例相对较高，说明二者在维持腿部支撑时更依赖膝关节力矩；LQR 和 PD 残差 PPO 的饱和比例较低，执行器余量相对更大。直接 PPO 的三路饱和比例均为零，但这并不代表控制效果最好，因为它同时出现了较大的速度 RMSE，更可能是动作输出偏保守，没有充分使用可用力矩。因此，平均饱和比例只能说明力矩是否接近限幅，不能单独作为控制性能好坏的判断依据，分析执行器瓶颈时仍需要看分通道统计，并结合速度误差一起判断。
 
-表~\ref{tab:sat-channel} 显示，整体饱和比例主要由膝关节通道贡献，髋关节通道在该数据集中几乎不触及 $0.98$ 倍限幅。
-因此单一平均饱和比例只能作为粗指标；定位执行器瓶颈时应使用分通道统计。
 
-\subsection{PPO 受控训练协议比较}
+
+\subsection{PPO 同条件训练比较}
 表~\ref{tab:ppo-controlled} 单独列出三种 PPO 在主比较中的结果。三者使用相同的训练分布、训练步数、并行环境数、
 随机种子、学习率、熵系数和归一化动作惩罚；因此该表主要比较动作映射和基础控制器结构的影响。
 
 \begin{table}[htbp]
 \centering
-\caption{三种 PPO 的受控训练协议结果}
+\caption{三种 PPO 的同条件训练结果}
 \label{tab:ppo-controlled}
 \scriptsize
 \setlength{\tabcolsep}{3.5pt}
@@ -894,11 +907,11 @@ PD 残差 PPO & $8/8$ & 0.0108 & \textbf{0.233} & \textbf{0.428} & \textbf{0.263
 \end{tabularx}
 \end{table}
 
-表~\ref{tab:ppo-controlled} 显示，PD 残差 PPO 在三种 PPO 中给出最低速度误差和最低姿态误差；
+表~\ref{tab:ppo-controlled} 显示，PD 残差 PPO 在三种 PPO 中给出最低速度误差和最低姿态误差。
 前馈残差 PPO 的速度误差显著变大，说明基础反馈项对学习策略承担稳定和速度任务都很重要。
-直接 PPO 的高度 RMSE 最低且没有触及力矩饱和，但速度 RMSE 明显偏大；从控制量角度看，它更像是在当前惩罚权重下
-学到了保守的低能量策略，而不是有效的高速跟踪策略。由于三种动作到物理力矩的尺度仍不同，表中结论应理解为
-当前动作映射设计的受控实验结果，而不是对所有直接力矩 PPO 形式的否定。
+直接 PPO 的高度 RMSE 最低且没有触及力矩饱和，但速度 RMSE 明显偏大。从控制量角度看，它更像是在当前惩罚权重下
+学到了保守的低能量策略，而不是有效的高速跟踪策略。三种方法的动作尺度并不完全相同，因此表中结果只对应这次实现，
+不能推广到所有直接力矩 PPO 写法。
 
 \begin{figure}[htbp]
 \centering
@@ -913,19 +926,18 @@ PD 残差 PPO & $8/8$ & 0.0108 & \textbf{0.233} & \textbf{0.428} & \textbf{0.263
 \includegraphics[width=\linewidth]{G_requirement_boundary__controller_comparison.png}
 \caption{G 边界组合}
 \end{subfigure}
-\caption{受控 PPO 协议下的代表性对照曲线}
+\caption{同条件训练下的代表性对照曲线}
 \label{fig:ppo-controlled}
 \end{figure}
 
-图~\ref{fig:ppo-controlled} 对应表~\ref{tab:ppo-controlled} 的受控协议数据。
-第~\ref{sec:scene-analysis} 节的五控制器分场景图同样来自表~\ref{tab:aggregate} 的主比较数据。
+图~\ref{fig:ppo-controlled} 使用表~\ref{tab:ppo-controlled} 的数据。
+第~\ref{sec:scene-analysis} 节的五控制器分场景图使用表~\ref{tab:aggregate} 所属的主比较数据。
 
 
 \section{分场景结果分析}
 \label{sec:scene-analysis}
 本节表格列出五种控制器。叠加图的四个子图自上而下
-分别为高度误差、躯干俯仰角、水平速度和力矩范数；这些曲线用于观察误差出现的时间位置、扰动后的恢复过程
-以及控制量变化。表格给出全时域统计量，用于和曲线中的局部现象对应。
+分别为高度误差、躯干俯仰角、水平速度和力矩范数。
 
 \subsection{场景 A：瞬态强冲击}
 \begin{table}[!htb]
@@ -954,7 +966,7 @@ PD 残差 PPO & \good & 0.00093 & 0.00310 & $0.0226^\circ$ & $0.0700^\circ$ & 0.
 \end{figure}
 
 图~\ref{fig:scene-a-comparison} 用同一坐标系比较五种控制器在瞬态水平冲击下的响应。图中
-$t=\SI{5}{s}$ 处的外力脉冲主要对应速度和力矩范数的短时变化；高度误差曲线中较大的下沉出现在启动加速阶段，
+$t=\SI{5}{s}$ 处的外力脉冲主要对应速度和力矩范数的短时变化，高度误差曲线中较大的下沉出现在启动加速阶段，
 而不是脉冲施加时刻。图~\ref{fig:scene-a} 进一步单独列出 LQR 与直接 PPO，便于查看两者在高度、速度和姿态通道上的差异。
 
 结合表~\ref{tab:scene-a}，五种控制器均未终止且未出现力矩饱和。WBC/QP 的高度和姿态误差低于表格有效精度，
@@ -1006,12 +1018,11 @@ PD 残差 PPO & \good & 0.00175 & 0.00259 & $0.0555^\circ$ & $0.0619^\circ$ & 0.
 \end{figure}
 
 图~\ref{fig:scene-b-comparison} 展示了持续 \SI{80}{N} 水平推力作用下的全时域响应。速度子图中，
-LQR、前馈残差 PPO 和直接 PPO 均出现持续速度偏差；WBC/QP 的速度曲线更接近指令速度。图~\ref{fig:scene-b}
-把 LQR 和 WBC/QP 单独列出，用于对比持续外力下的偏置响应与平台通道保持情况。
+LQR、前馈残差 PPO 和直接 PPO 均出现持续速度偏差；WBC/QP 的速度曲线更接近指令速度。
 
 表~\ref{tab:scene-b} 中，LQR 的速度 RMSE 为 \SI{0.7162}{m/s}，对应图中长期低于指令速度的曲线。
-WBC/QP 的速度 RMSE 降至 \SI{0.1947}{m/s}，同时高度和姿态误差仍接近数值精度；这与其速度积分项和平台任务权重有关。
-WBC/QP 的速度 RMSE 降至 \SI{0.1947}{m/s}，同时高度和姿态误差仍接近数值精度；这与其速度积分项和平台任务权重有关。
+WBC/QP 的速度 RMSE 降至 \SI{0.1947}{m/s}，同时高度和姿态误差仍接近数值精度；其控制律包含速度积分，
+并对平台高度和姿态设定了较高权重。
 PD 残差 PPO 的速度 RMSE 为 \SI{0.5142}{m/s}，姿态 RMSE 为 \SI{0.0555}{\degree}。
 直接 PPO 的姿态 RMSE 为 \SI{0.4324}{\degree}，但速度 RMSE 为 \SI{2.7948}{m/s}。
 前馈残差 PPO 的速度 RMSE 达到 \SI{3.7231}{m/s}，是该场景中最明显的速度失控案例。
@@ -1067,7 +1078,7 @@ PD 残差 PPO & \good & 0.02473 & 0.10427 & $0.4264^\circ$ & $1.8211^\circ$ & 0.
 WBC/QP 的速度 RMSE 为 \SI{0.1630}{m/s}，低于其他控制器；直接 PPO 的速度 RMSE 则达到
 \SI{7.7708}{m/s}。LQR 不显式使用地形信息，高度 RMSE 为
 \SI{0.03514}{m}，最大高度误差达到 \SI{0.11996}{m}，这与图中周期性高度误差相对应。PD 残差 PPO 的速度 RMSE 为
-\SI{0.4810}{m/s}，前馈残差 PPO 为 \SI{0.7706}{m/s}；两者都明显优于直接 PPO 的速度跟踪。
+\SI{0.4810}{m/s}，前馈残差 PPO 为 \SI{0.7706}{m/s}，两者都明显优于直接 PPO 的速度跟踪。
 
 \begin{figure}[!htb]
 \centering
@@ -1202,15 +1213,14 @@ PD 残差 PPO & \good & 0.00333 & 0.00799 & $0.0452^\circ$ & $0.1253^\circ$ & 0.
 
 图~\ref{fig:scene-e-comparison} 给出组合压力场景下的五控制器叠加响应。该场景同时包含不规则地形、持续外力和
 \SI{100}{N} 脉冲，外力峰值达到 \SI{160}{N}。图中的红色前馈残差曲线在速度通道持续偏离，其高度和姿态仍未超过
-终止阈值；这说明“未终止”和“速度跟踪良好”在该场景中需要分开判断。图~\ref{fig:scene-e} 单独给出 WBC/QP 与
+终止阈值。这说明没有触发终止阈值，不代表速度跟踪正常。图~\ref{fig:scene-e} 单独给出 WBC/QP 与
 直接 PPO，便于观察两种代表性控制器在平台通道和速度通道上的差异。
 
 表~\ref{tab:scene-e} 中，WBC/QP 的高度 RMSE 为 \SI{0.00019}{m}，姿态 RMSE 为
 \SI{0.0117}{\degree}，速度 RMSE 为 \SI{0.1996}{m/s}，饱和比例为 $1.62\%$。PD 残差 PPO 的速度
 RMSE 为 \SI{0.4291}{m/s}，LQR 为 \SI{0.5833}{m/s}，前馈残差 PPO 为 \SI{2.8575}{m/s}。
 直接 PPO 的姿态 RMSE 为 \SI{0.3123}{\degree}，但速度 RMSE 为 \SI{4.4003}{m/s}。
-该场景超出题目外力上限，因此它在本文中用于观察
-组合扰动下的响应形态，而不作为题目范围内的性能边界。
+
 
 \begin{figure}[!htb]
 \centering
@@ -1236,7 +1246,7 @@ RMSE 为 \SI{0.4291}{m/s}，LQR 为 \SI{0.5833}{m/s}，前馈残差 PPO 为 \SI{
 图~\ref{fig:scene-e-diagnostics} 为场景 E 的 WBC/QP 诊断图，分别给出接触力与摩擦边界、实际腿长与预测腿长、
 约束残差/松弛量、摩擦利用率和求解状态。对应的诊断数据中，最大摩擦利用率为 0.7507，QP 与 OSQP 状态均为
 $100\%$ 成功，最大等式残差约 $1.14\times10^{-13}$，不等式违反量为零。平均 OSQP 求解耗时约
-\SI{0.078}{ms}，最大约 \SI{1.31}{ms}。这些数值对应当前电脑、当前轨迹和当前降阶模型下的求解记录。
+\SI{0.078}{ms}，最大约 \SI{1.31}{ms}。这些耗时和残差只对应本次运行环境、轨迹和降阶模型。
 
 \FloatBarrier
 \subsection{场景 F：\SI{5}{m/s} 高速平地}
@@ -1306,7 +1316,7 @@ PD 残差 PPO & \good & 0.02059 & 0.09016 & $0.5590^\circ$ & $2.3240^\circ$ & 0.
 
 图~\ref{fig:scene-g-comparison} 对应题目边界组合场景，速度为 \SI{5}{m/s}，水平外力为 \SI{100}{N}，
 地形为规则正弦起伏。该图同时显示高速启动、持续推力和地形周期扰动对四个通道的影响。图~\ref{fig:scene-g}
-单独列出 WBC/QP 与直接 PPO：前者的高度和姿态曲线接近零线，后者在该受控协议下速度偏差明显。
+单独列出 WBC/QP 与直接 PPO：前者的高度和姿态曲线接近零线，后者在该相同条件下速度偏差明显。
 
 表~\ref{tab:scene-g} 中，WBC/QP 的高度 RMSE 为 \SI{0.00043}{m}，姿态 RMSE 为
 \SI{0.0141}{\degree}，速度 RMSE 为 \SI{0.3882}{m/s}，饱和比例为 $2.70\%$。PD 残差 PPO 的速度
@@ -1358,7 +1368,7 @@ H1 持续 & 直接 PPO & \good & 0.04677 & $1.9220^\circ$ & 4.2173 & 0 \\
 \end{tabular}
 \end{table}
 
-表~\ref{tab:static-push} 表明，\SI{0}{m/s} 脉冲场景下五种控制器均可维持粗安全条件；
+表~\ref{tab:static-push} 表明，\SI{0}{m/s} 脉冲场景下五种控制器均未触发本文设定的终止条件；
 持续 \SI{100}{N} 外力下，WBC/QP 的速度偏差较小，LQR 因缺少外力估计和积分出现明显稳态偏差，
 前馈残差 PPO 和直接 PPO 则出现严重速度跑偏。该结果仍是确定性检查，不能替代多扰动时刻、多方向外力和多随机种子的统计评估。
 
@@ -1387,10 +1397,10 @@ PD 残差 PPO 训练较容易，并且在受控协议下给出三种 PPO 中最�
 说明直接力矩动作空间仍需要更合适的奖励、动作尺度或安全过滤设计。部署前需要多随机种子训练、域随机化、
 观测噪声与时延训练、动作变化率限制，并在策略输出后增加 QP 安全过滤器或备用控制器。
 
-\subsection{推荐方案}
-对题目中“速度跟踪、躯干竖直、地形扰动和水平外力”同时存在的任务，本文推荐以降阶 WBC/QP 为主控制器，
-理由是其任务优先级与约束可显式解释，并在边界场景 G 中给出最小高度、姿态误差和最低速度误差。PD 残差 PPO
-可作为学习策略对照；在当前证据下，直接 PPO 尚未作为速度补偿或安全关键主控制器使用。LQR 保留为基线和故障回退方案。
+\subsection{最优方案}
+综合各场景结果，本文更推荐将降阶 WBC/QP 作为主控制器。该控制器能把高度、姿态、速度和力矩约束直接写入优化问题，因此调节目标和约束边界都比较清楚。在题目边界场景 G 中，WBC/QP 同时保持了较小的高度误差、姿态误差和速度误差，说明它在高速、外力和地形扰动同时存在时仍能较好地分配三路力矩。
+
+PD 残差 PPO 可以作为学习控制方案的对照。它的速度和姿态指标明显好于前馈残差 PPO 和直接 PPO，说明基础反馈对策略稳定性很重要。但从当前实验看，PPO 结果仍依赖训练分布、奖励权重和动作尺度，暂时不适合作为安全关键的主控制器。直接 PPO 虽然在部分场景中高度和姿态误差不大，但速度跟踪偏差较大，因此不宜直接用于速度补偿任务。LQR 结构简单、计算量低，适合作为基线方法，也可以作为故障回退方案。
 
 \section{复现方式与代码核验清单}
 
@@ -1489,10 +1499,10 @@ python -B -m unittest discover -s tests -v
 本文在统一二维降阶平台上比较了 LQR、降阶 WBC/QP 和三种 PPO 结构。结果支持以下结论：
 \begin{enumerate}
   \item 五种实现均未触发当前安全终止阈值，但前馈残差 PPO 的严重速度偏差说明安全成功率不能替代任务性能指标。
-  \item WBC/QP 在高度和姿态指标上最优，尤其适合平台稳定优先的任务；其极小误差受到共享精确模型和地形预瞄条件的显著影响。
-  \item 在相同训练预算、学习率、熵系数和动作惩罚下，PD 残差 PPO 给出三种 PPO 中较好的速度与姿态折中；直接 PPO 虽然高度和姿态误差较小，但平均速度 RMSE 达到 \SI{6.572}{m/s}，说明当前直接力矩动作空间和奖励尺度不足以可靠完成速度跟踪。
+  \item WBC/QP 在高度和姿态指标上最优，尤其适合平台稳定优先的任务，其极小误差受到共享精确模型和地形预瞄条件的显著影响。
+  \item 在相同训练预算、学习率、熵系数和动作惩罚下，PD 残差 PPO 给出三种 PPO 中较好的速度与姿态折中。直接 PPO 虽然高度和姿态误差较小，但平均速度 RMSE 达到 \SI{6.572}{m/s}，说明当前直接力矩动作空间和奖励尺度不足以可靠完成速度跟踪。
   \item LQR 作为基线稳定可靠，但缺少积分、扰动估计和地形适应时，持续外力与高速组合工况下速度误差较大。
-  \item \SI{0}{m/s} 静止抗扰检查支持主实验趋势，但本文实验仍是确定性课程仿真比较，不是实机稳定性证明。下一步应加入多随机种子、参数失配、传感器噪声、时延、接触切换和高保真多刚体模型。
+  \item \SI{0}{m/s} 静止抗扰检查支持主实验趋势，但本实验仍是仿真比较，不是实机稳定性证明。下一步应加入多随机种子、参数失配、传感器噪声、时延、接触切换和高保真多刚体模型。
 \end{enumerate}
 
 从题目目标出发，推荐采用 WBC/QP 作为主要控制器，并把 LQR 用作简洁基线，把 PPO 用作策略结构对照。
